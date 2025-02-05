@@ -688,7 +688,38 @@ function Abstand(punkt1, punkt2) {
     return null
   }
 
-  return Math.sqrt(Math.pow(p2[0] - p1[0], 2) + Math.pow(p2[1] - p1[1], 2))
+  const dist = Math.sqrt(
+    Math.pow(p2[0] - p1[0], 2) + Math.pow(p2[1] - p1[1], 2)
+  ).toFixed(2)
+  const lineName = `Lineal_${punkt1}_${punkt2}`
+  const textName = `Abstand_${punkt1}_${punkt2}`
+
+  // Zeichne eine Linie zwischen den Punkten (Lineal)
+  series.push({
+    name: lineName,
+    type: 'line',
+    coordinateSystem: 'cartesian2d',
+    data: [p1, p2],
+    lineStyle: { color: '#000', width: 1, type: 'dashed' },
+  })
+
+  // Füge den Abstand als Text hinzu
+  series.push({
+    name: textName,
+    type: 'scatter',
+    coordinateSystem: 'cartesian2d',
+    data: [[(p1[0] + p2[0]) / 2, (p1[1] + p2[1]) / 2]],
+    symbolSize: 0,
+    label: {
+      show: true,
+      formatter: `${dist}`,
+      position: 'top',
+      fontSize: 14,
+      color: '#000',
+    },
+  })
+
+  return dist
 }
 
 function Vektor(startpunkt, endpunkt, name = null) {

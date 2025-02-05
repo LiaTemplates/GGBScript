@@ -134,9 +134,11 @@ const P = Polygon(A, B, C);
 
 // Verschiebe das Polygon
 const P2 = Verschiebung(P, @input(`x`), @input(`y`), "P2");
+
+Farbe(P2, "lightblue");
 ```
 
-### Mittelpunkt
+## Mittelpunkt
 
 A = (<script input="range" min="0" max="100" value="1" step="1" default="1" output="A0">
 @input
@@ -158,6 +160,24 @@ const P = Polygon(A, B, C);
 
 Mittelpunkt(A, B, C);
 ```
+
+## Abstand
+
+``` js @GGBScript
+// Definiere Punkte
+let A = Punkt(1, 2, "A");
+let B = Punkt(4, 6, "B");
+let C = Punkt(2, 5, "C");
+let D = Punkt(6, 3, "D");
+
+Polygon(A, B, C);
+
+let M = Mittelpunkt(A, B, C);
+
+// Berechne den Abstand der Geraden
+let d = Abstand(M, D);
+```
+
 
 ## Schnittpunkt
 
