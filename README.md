@@ -174,7 +174,40 @@ let g2 = Strecke(C, D, "g2");
 
 // Berechne den Schnittpunkt der Geraden
 let S = Schnittpunkt(g1, g2);
+
+Winkel(A, S, C);
 ```
+
+## Winkel
+
+``` js @GGBScript
+// Definiere Punkte
+let A = Punkt(1, 2, "A");
+let B = Punkt(4, 6, "B");
+let C = Punkt(2, 5, "C");
+
+Strecke(A, B, "s1");
+Strecke(B, C, "s2");
+
+// Erzeuge ein Polygon
+let w = Winkel(A, B, C);
+```
+## Lot
+
+``` js @GGBScript
+// Definiere Punkte
+let A = Punkt(1, 2, "A");
+let B = Punkt(4, 6, "B");
+let C = Punkt(2, 5, "C");
+
+// Erzeuge ein Gerade
+let G = Gerade(A, B, "G");
+
+// Erzeuge ein Lot
+let L = Lot(C, G, "L");
+```
+
+
 
 # Rotation
 
@@ -222,7 +255,9 @@ Farbe(P, "red");
 
 const M = Mittelpunkt(P);
 
-Rotation(P, M, @input(`rotation`));
+const P2 = Rotation(P, M, @input(`rotation`));
+
+Farbe(P2, "blue");
 
 Kreis(M, 16, "Kreis");
 ```

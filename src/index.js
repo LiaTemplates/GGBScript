@@ -479,53 +479,6 @@ function Kreis(mittelpunkt, radius, name = null) {
 }
 
 // Modifizierte Transformationsfunktionen für mehrere Objekttypen
-
-function Spiegelung(element, spiegelungsPunkt, name = null) {
-  const spiegel = getCoord(spiegelungsPunkt)
-
-  if (!spiegel) {
-    console.error('Spiegelung: Ungültiger Spiegelpunkt.')
-    return null
-  }
-
-  // Suche in series nach dem Element
-  const seriesElement = series.find((s) => s.name === element)
-
-  if (points[element]) {
-    // Punktspiegelung
-    const p = points[element]
-    const gespiegeltX = 2 * spiegel[0] - p[0]
-    const gespiegeltY = 2 * spiegel[1] - p[1]
-
-    let index = 1
-    while (points['S' + index]) index++
-    const spiegelName = name || 'S' + index
-    points[spiegelName] = [gespiegeltX, gespiegeltY]
-    pointStyles[spiegelName] = { color: 'green' }
-    return spiegelName
-  } else if (seriesElement) {
-    // Spiegelung von Linien, Polygonen, Kreisen
-    const transformedData = seriesElement.data.map((coord) => {
-      return [2 * spiegel[0] - coord[0], 2 * spiegel[1] - coord[1]]
-    })
-
-    let index = 1
-    while (series.some((s) => s.name === `Gespiegelt${index}`)) index++
-    const newName = name || `Gespiegelt${index}`
-
-    const newSerie = {
-      ...seriesElement,
-      name: newName,
-      data: transformedData,
-    }
-    series.push(newSerie)
-    return newName
-  }
-
-  console.error('Spiegelung: Element nicht gefunden.')
-  return null
-}
-
 function Verschiebung(element, verschiebungX, verschiebungY, name = null) {
   // Suche in series nach dem Element
   const seriesElement = series.find((s) => s.name === element)
@@ -556,6 +509,14 @@ function Verschiebung(element, verschiebungX, verschiebungY, name = null) {
       ...seriesElement,
       name: newName,
       data: transformedData,
+      // Reset color to allow independent styling
+      lineStyle: {
+        ...seriesElement.lineStyle,
+        color: seriesElement.lineStyle?.color || '#000',
+      },
+      areaStyle: seriesElement.areaStyle
+        ? { ...seriesElement.areaStyle }
+        : undefined,
     }
     series.push(newSerie)
     return newName
@@ -608,6 +569,14 @@ function Rotation(element, drehpunkt, winkelGrad, name = null) {
       ...seriesElement,
       name: newName,
       data: transformedData,
+      // Reset color to allow independent styling
+      lineStyle: {
+        ...seriesElement.lineStyle,
+        color: seriesElement.lineStyle?.color || '#000',
+      },
+      areaStyle: seriesElement.areaStyle
+        ? { ...seriesElement.areaStyle }
+        : undefined,
     }
     series.push(newSerie)
     return newName
@@ -617,6 +586,59 @@ function Rotation(element, drehpunkt, winkelGrad, name = null) {
   return null
 }
 
+function Spiegelung(element, spiegelungsPunkt, name = null) {
+  const spiegel = getCoord(spiegelungsPunkt)
+
+  if (!spiegel) {
+    console.error('Spiegelung: Ungültiger Spiegelpunkt.')
+    return null
+  }
+
+  // Suche in series nach dem Element
+  const seriesElement = series.find((s) => s.name === element)
+
+  if (points[element]) {
+    // Punktspiegelung
+    const p = points[element]
+    const gespiegeltX = 2 * spiegel[0] - p[0]
+    const gespiegeltY = 2 * spiegel[1] - p[1]
+
+    let index = 1
+    while (points['S' + index]) index++
+    const spiegelName = name || 'S' + index
+    points[spiegelName] = [gespiegeltX, gespiegeltY]
+    pointStyles[spiegelName] = { color: 'green' }
+    return spiegelName
+  } else if (seriesElement) {
+    // Spiegelung von Linien, Polygonen, Kreisen
+    const transformedData = seriesElement.data.map((coord) => {
+      return [2 * spiegel[0] - coord[0], 2 * spiegel[1] - coord[1]]
+    })
+
+    let index = 1
+    while (series.some((s) => s.name === `Gespiegelt${index}`)) index++
+    const newName = name || `Gespiegelt${index}`
+
+    const newSerie = {
+      ...seriesElement,
+      name: newName,
+      data: transformedData,
+      // Reset color to allow independent styling
+      lineStyle: {
+        ...seriesElement.lineStyle,
+        color: seriesElement.lineStyle?.color || '#000',
+      },
+      areaStyle: seriesElement.areaStyle
+        ? { ...seriesElement.areaStyle }
+        : undefined,
+    }
+    series.push(newSerie)
+    return newName
+  }
+
+  console.error('Spiegelung: Element nicht gefunden.')
+  return null
+}
 // Schnittpunkt von zwei Geraden
 function Schnittpunkt(gerade1, gerade2, name = null) {
   const g1 = series.find((s) => s.name === gerade1)
@@ -669,32 +691,113 @@ function Abstand(punkt1, punkt2) {
   return Math.sqrt(Math.pow(p2[0] - p1[0], 2) + Math.pow(p2[1] - p1[1], 2))
 }
 
-// Winkel zwischen zwei Geraden
-function Winkel(gerade1, gerade2) {
-  const g1 = series.find((s) => s.name === gerade1)
-  const g2 = series.find((s) => s.name === gerade2)
+function Winkel(A, B, C, name = null) {
+  const a = getCoord(A)
+  const b = getCoord(B)
+  const c = getCoord(C)
 
-  if (!g1 || !g2) {
-    console.error('Winkel: Mindestens eine Gerade nicht gefunden.')
+  if (!a || !b || !c) {
+    console.error('Winkel: Mindestens einer der Punkte ist ungültig.')
     return null
   }
 
-  const [[x1, y1], [x2, y2]] = g1.data
-  const [[x3, y3], [x4, y4]] = g2.data
+  // Vektoren AB und BC
+  const AB = [a[0] - b[0], a[1] - b[1]]
+  const BC = [c[0] - b[0], c[1] - b[1]]
 
-  // Steigungen
-  const m1 = (y2 - y1) / (x2 - x1)
-  const m2 = (y4 - y3) / (x4 - x3)
+  // Skalarprodukt
+  const dotProduct = AB[0] * BC[0] + AB[1] * BC[1]
+  const normAB = Math.sqrt(AB[0] ** 2 + AB[1] ** 2)
+  const normBC = Math.sqrt(BC[0] ** 2 + BC[1] ** 2)
 
-  // Winkelberechnung
-  const tangens = Math.abs((m2 - m1) / (1 + m1 * m2))
-  const winkelRadiant = Math.atan(tangens)
-  const winkelGrad = (winkelRadiant * 180) / Math.PI
+  if (normAB === 0 || normBC === 0) {
+    console.error('Winkel: Nullvektor erkannt.')
+    return null
+  }
 
-  return winkelGrad
+  // Winkel in Grad berechnen
+  let angleRad = Math.acos(dotProduct / (normAB * normBC))
+  let angleDeg = (angleRad * 180) / Math.PI
+
+  // Erzeuge Namen für den Winkel
+  let index = 1
+  while (series.some((s) => s.name === `Winkel${index}`)) index++
+  const angleName = name || `Winkel${index}`
+
+  // Bestimme die Drehrichtung
+  const crossProduct = AB[0] * BC[1] - AB[1] * BC[0]
+  const rotationDirection = crossProduct > 0 ? 1 : -1
+
+  // Zeichne den Winkelbogen
+  const angleRadius = 1
+  const startAngle = Math.atan2(AB[1], AB[0])
+  const endAngle = Math.atan2(BC[1], BC[0])
+
+  const numSegments = 20
+  const arcPoints = [[b[0], b[1]]]
+
+  const sweepAngle =
+    rotationDirection > 0
+      ? (endAngle - startAngle + 2 * Math.PI) % (2 * Math.PI)
+      : (startAngle - endAngle + 2 * Math.PI) % (2 * Math.PI)
+
+  const smallerAngle = Math.min(sweepAngle, 2 * Math.PI - sweepAngle)
+  angleDeg = (smallerAngle * 180) / Math.PI
+
+  for (let i = 0; i <= numSegments; i++) {
+    let t = i / numSegments
+    let angle = startAngle + t * sweepAngle * rotationDirection
+    let x = b[0] + angleRadius * Math.cos(angle)
+    let y = b[1] + angleRadius * Math.sin(angle)
+    arcPoints.push([x, y])
+  }
+  arcPoints.push([b[0], b[1]]) // Schließt das Segment
+
+  series.push({
+    name: angleName,
+    type: 'line',
+    coordinateSystem: 'cartesian2d',
+    data: arcPoints,
+    symbol: 'none',
+    lineStyle: { color: '#FFA500', width: 2, type: 'solid' },
+    areaStyle: { color: 'rgba(255, 165, 0, 0.3)' },
+  })
+
+  // Textlabel für den Winkel
+  series.push({
+    name: angleName,
+    type: 'scatter',
+    coordinateSystem: 'cartesian2d',
+    data: [
+      [
+        b[0] +
+          1.5 *
+            angleRadius *
+            Math.cos(startAngle + (sweepAngle / 2) * rotationDirection),
+        b[1] +
+          1.5 *
+            angleRadius *
+            Math.sin(startAngle + (sweepAngle / 2) * rotationDirection),
+      ],
+    ],
+    symbolSize: 0,
+    label: {
+      show: true,
+      formatter: `${angleDeg.toFixed(2)}°`,
+      position: 'top',
+      fontSize: 14,
+    },
+    tooltip: {
+      trigger: 'item',
+      formatter: `<strong>${angleName}</strong><br>Winkel: ${angleDeg.toFixed(
+        2
+      )}°`,
+    },
+  })
+
+  return angleDeg.toFixed(2)
 }
 
-// Lotrechte Gerade durch einen Punkt
 function Lot(punkt, gerade, name = null) {
   const p = getCoord(punkt)
   const g = series.find((s) => s.name === gerade)
@@ -705,24 +808,31 @@ function Lot(punkt, gerade, name = null) {
   }
 
   const [[x1, y1], [x2, y2]] = g.data
+
+  // Steigung der Ursprungsgerade
   const m = (y2 - y1) / (x2 - x1)
 
-  // Lotrechte Steigung: negativer Kehrwert
+  // Lotrechte Steigung ist der negative Kehrwert
   const lotSteigung = -1 / m
-  const lotY = p[1] + lotSteigung * (p[0] - p[0])
+
+  // Lotpunkt berechnen
+  // Gleichung der Ursprungsgerade: y - y1 = m(x - x1)
+  // Gleichung des Lots: y - p[1] = lotSteigung(x - p[0])
+  // Schnittpunkt dieser Gleichungen
+  const lotX = (lotSteigung * p[0] - m * x1 + y1 - p[1]) / (lotSteigung - m)
+  const lotY = m * (lotX - x1) + y1
 
   let index = 1
   while (series.some((s) => s.name === `Lot${index}`)) index++
   const lotName = name || `Lot${index}`
 
-  // Erzeugt eine Linie durch den Punkt mit der Lotsteigung
   series.push({
     name: lotName,
     type: 'line',
     coordinateSystem: 'cartesian2d',
     data: [
       [p[0], p[1]],
-      [p[0] + 1, lotY],
+      [lotX, lotY],
     ],
     lineStyle: { color: '#A0A', width: 2, type: 'dashed' },
   })
