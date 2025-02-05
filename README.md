@@ -261,3 +261,10 @@ Farbe(P2, "blue");
 
 Kreis(M, 16, "Kreis");
 ```
+
+## Vektor
+
+``` js @GGBScript
+// Erzeuge einen Vektor
+let V = Vektor([1,2], [4,6], "V");
+```

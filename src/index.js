@@ -691,6 +691,45 @@ function Abstand(punkt1, punkt2) {
   return Math.sqrt(Math.pow(p2[0] - p1[0], 2) + Math.pow(p2[1] - p1[1], 2))
 }
 
+function Vektor(startpunkt, endpunkt, name = null) {
+  const start = getCoord(startpunkt)
+  const end = getCoord(endpunkt)
+
+  if (!start || !end) {
+    console.error('Vektor: Ungültige Punkte.')
+    return null
+  }
+
+  let vectorName = name || 'Vektor' + (series.length + 1)
+
+  // Berechne Vektorkomponenten
+  const dx = end[0] - start[0]
+  const dy = end[1] - start[1]
+  const length = Math.sqrt(dx * dx + dy * dy)
+
+  series.push({
+    name: vectorName,
+    type: 'line',
+    coordinateSystem: 'cartesian2d',
+    data: [start, end],
+    symbol: ['none', 'arrow'], // Pfeilspitze nur am Ende
+    symbolSize: 10,
+    lineStyle: {
+      color: '#FF4500',
+      width: 2,
+    },
+    tooltip: {
+      formatter: `<strong>${vectorName}</strong><br>Start: (${start[0]}, ${
+        start[1]
+      })<br>Ende: (${end[0]}, ${end[1]})<br>Länge: ${length.toFixed(
+        2
+      )}<br>Richtung: (${dx.toFixed(2)}, ${dy.toFixed(2)})`,
+    },
+  })
+
+  return vectorName
+}
+
 function Winkel(A, B, C, name = null) {
   const a = getCoord(A)
   const b = getCoord(B)
