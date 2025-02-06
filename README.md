@@ -42,19 +42,37 @@ const B = Punkt([4, 6], "B");
 
 ## Gerade
 
-``` js @GGBScript
-Titel("Gerade g1 & g2");
+1. `Gerade( Punkt, Punkt )`
 
-// Definiere Punkte
-const A = Punkt(1, 2, "A");
-const B = Punkt(4, 6, "B");
-const C = Punkt(2, 5, "C");
-const D = Punkt(6, 3, "D");
+   Erzeugt eine Gerade durch zwei Punkte.
 
-// Erzeuge zwei Geraden
-const g1 = Gerade(A, B, "g1");
-const g2 = Gerade(C, D, "g2");
-```
+   ``` js @GGBScript
+   Titel("Gerade g");
+
+   // Definiere Punkte
+   const A = Punkt(1, 2, "A");
+   const B = Punkt(4, 6, "B");
+
+   // Erzeuge eine Gerade
+   const g = Gerade(A, B, "g");
+   ```
+
+2. `Gerade( Punkt, Gerade )`
+
+   Erzeugt eine Gerade durch einen Punkt und eine Gerade.
+
+   ``` js @GGBScript
+   Titel("Gerade g1 & g2");
+
+   // Definiere Punkte
+   const A = Punkt(1, 2, "A");
+   const B = Punkt(4, 6, "B");
+   const C = Punkt(0, 5, "C");
+
+   // Erzeuge zwei Geraden
+   const g1 = Gerade(A, B, "g1");
+   const g2 = Gerade(C, g1, "g2");
+   ```
 
 ## Strecke
 
@@ -75,6 +93,8 @@ const g2 = Gerade(C, D, "g2");
 
 2. `Strecke( Punkt, Länge )`
 
+   Erzeugt eine Strecke mit einer bestimmten Länge.
+
    ``` js @GGBScript
    Titel("Strecke s1 & s2 & s3");
 
@@ -88,7 +108,67 @@ const g2 = Gerade(C, D, "g2");
    const s3 = Strecke([1,1], 3, "s3");
    ```
 
+## Vektor 
 
+1. `Vektor( Punkt )`
+
+``` js @GGBScript
+
+Titel("Vektor V1");
+
+// Definiere einen Punkt
+const A = Punkt(1, 2, "A");
+
+// Erzeuge einen Vektor
+const V1 = Vektor(A, "V1");
+const V2 = Vektor([-1,2]);
+```
+
+2. `Vektor( Punkt, Punkt )`
+
+``` js @GGBScript
+Titel("Vektor V");
+
+// Definiere Punkte
+const A = Punkt(1, 2, "A");
+const B = Punkt(4, 6, "B");
+
+// Erzeuge einen Vektor
+const V = Vektor(A, B, "V");
+```
+
+## Vieleck
+
+``` js @GGBScript
+Titel("Vieleck V");
+
+// Definiere Punkte
+const A = Punkt(1, 2, "A");
+const B = Punkt(4, 6, "B");
+const C = Punkt(2, 5, "C");
+
+// Erzeuge ein Vieleck
+const V = Vieleck(A, B, C);
+```
+
+``` js @GGBScript
+Titel("Vieleck V2");
+
+// Hier ist (1,1) der Mittelpunkt und (4,1) ein Punkt auf dem Umfang;
+// 6 gibt die Anzahl der Ecken an.
+Vieleck([1, 1], [4, 1], 8);
+```
+
+``` js @GGBScript
+Vieleck([2,2], [5,2], 5, [0,1]);
+```
+
+``` js @GGBScript
+Diagramm(false)
+const V = Vieleck([1, 1], [3, 0], [3, 2], [0, 4]);
+
+Rotation(V, [1, 1], 45);
+```
 
 ## Polygon
 
@@ -118,7 +198,6 @@ const A = Punkt(1.5, 1.5, "A")
 // Erzeuge einen Kreis
 const K = Kreis(A, 1, "K")
 ```
-
 
 2. Kreis mit Radius einer Strecke `Kreis("M", "Strecke1")`
 
@@ -186,20 +265,20 @@ Kreis("A", 1, "Gerade1");
 
 6. Kreis mit Richtung eines Vektors `Kreis("M", 5, "Vektor1")`
 
-    ``` js @GGBScript
-    Titel("Kreis K6")
-    UserAxisLimits(-2.5, 5, 0, 3)
+   ``` js @GGBScript
+   Titel("Kreis K6")
+   UserAxisLimits(-2.5, 5, 0, 3)
 
-    // Definiere Punkte
-    const A = Punkt(1, 1, "A")
-    const B = Punkt(3, 2, "B")
+   // Definiere Punkte
+   const A = Punkt(1, 1, "A")
+   const B = Punkt(3, 2, "B")
 
-    // Erzeuge einen Vektor
-    const V = Vektor(A, B, "Vektor1")
+   // Erzeuge einen Vektor
+   const V = Vektor(A, B, "Vektor1")
 
-    // Erzeuge einen Kreis
-    Kreis("A", 1, "Vektor1");
-    ```
+   // Erzeuge einen Kreis
+   Kreis("A", 1, "Vektor1");
+   ```
 
 ## Ellipse
 

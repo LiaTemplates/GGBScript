@@ -6,6 +6,18 @@
 let objects = {} // Gemeinsames Dictionary für alle Objekte (Punkte, Linien, etc.)
 let TITLE = '' // Diagrammtitel (optional)
 let globalAxisLimits = {} // Globale Achsenlimits
+// Globale Variable, die steuert, ob das Diagramm gezeichnet wird.
+let diagrammAktiv = true
+
+/**
+ * Diagramm(aktiv)
+ *
+ * Schaltet das Zeichnen des Diagramms an oder aus.
+ * @param {boolean} aktiv - true: Diagramm anzeigen, false: Diagramm nicht anzeigen.
+ */
+function Diagramm(aktiv) {
+  diagrammAktiv = aktiv
+}
 
 // ------------------------------------------------------------
 // Hilfsfunktion: Serialisierung (inkl. Funktionen)
@@ -38,6 +50,7 @@ function GBScript_init() {
   objects = {}
   TITLE = ''
   globalAxisLimits = {}
+  diagrammAktiv = true
 }
 
 // ------------------------------------------------------------
@@ -231,73 +244,296 @@ function Strecke(arg1, arg2, name = null) {
 // Zeichnet eine unendliche Gerade (als Strecke in den Achsenbegrenzungen).
 // ------------------------------------------------------------
 function Gerade(arg1, arg2, name = null) {
-  const pt1 = getCoord(arg1),
-    pt2 = getCoord(arg2)
-  if (!pt1 || !pt2) {
-    console.error('Gerade: Mindestens einer der beiden Punkte ist ungültig.')
+  // Hole den Startpunkt (erster Parameter muss einen Punkt repräsentieren)
+  const p = getCoord(arg1)
+  if (!p) {
+    console.error('Gerade: Ungültiger erster Parameter (Punkt).')
     return null
   }
-  let axMinX =
-      typeof globalAxisLimits.minX === 'number' ? globalAxisLimits.minX : -10,
-    axMaxX =
-      typeof globalAxisLimits.maxX === 'number' ? globalAxisLimits.maxX : 10,
-    axMinY =
-      typeof globalAxisLimits.minY === 'number' ? globalAxisLimits.minY : -10,
-    axMaxY =
-      typeof globalAxisLimits.maxY === 'number' ? globalAxisLimits.maxY : 10
-  let endP1, endP2
-  if (pt1[0] === pt2[0]) {
-    endP1 = [pt1[0], axMinY]
-    endP2 = [pt1[0], axMaxY]
-  } else {
-    let m = (pt2[1] - pt1[1]) / (pt2[0] - pt1[0])
-    let b = pt1[1] - m * pt1[0]
-    let candidates = []
-    let yLeft = m * axMinX + b
-    if (yLeft >= axMinY && yLeft <= axMaxY) candidates.push([axMinX, yLeft])
-    let yRight = m * axMaxX + b
-    if (yRight >= axMinY && yRight <= axMaxY) candidates.push([axMaxX, yRight])
-    if (m !== 0) {
-      let xBottom = (axMinY - b) / m
-      if (xBottom >= axMinX && xBottom <= axMaxX)
-        candidates.push([xBottom, axMinY])
-      let xTop = (axMaxY - b) / m
-      if (xTop >= axMinX && xTop <= axMaxX) candidates.push([xTop, axMaxY])
-    }
-    let uniqueCandidates = []
-    candidates.forEach((pt) => {
-      if (
-        !uniqueCandidates.some(
-          (u) => Math.abs(u[0] - pt[0]) < 1e-9 && Math.abs(u[1] - pt[1]) < 1e-9
+
+  let secondPoint = null // Variante 1: zweiter Parameter als Punkt
+  let directionVector = null // Variante 2/3: zweiter Parameter als Richtungsvektor
+
+  // Unterscheide anhand des Typs des zweiten Parameters:
+  if (typeof arg2 === 'string') {
+    // arg2 als String: Es könnte sich um einen bekannten Punkt oder um eine bekannte Gerade handeln.
+    if (objects[arg2]) {
+      if (objects[arg2].type === 'point') {
+        // Variante 1: Zwei Punkte
+        secondPoint = getCoord(arg2)
+      } else if (objects[arg2].type === 'line') {
+        // Variante 2: Parallele Gerade – wir entnehmen den Richtungsvektor der bekannten Gerade.
+        const lineData = objects[arg2].data
+        if (!lineData || lineData.length < 2) {
+          console.error(
+            "Gerade: Die gegebene Gerade '" + arg2 + "' hat ungültige Daten."
+          )
+          return null
+        }
+        const lp1 = lineData[0],
+          lp2 = lineData[1]
+        directionVector = [lp2[0] - lp1[0], lp2[1] - lp1[1]]
+      } else {
+        console.error(
+          'Gerade: Der zweite Parameter muss ein Punkt, eine Gerade oder ein Richtungsvektor sein.'
         )
-      )
-        uniqueCandidates.push(pt)
-    })
-    if (uniqueCandidates.length < 2) {
+        return null
+      }
+    } else {
+      console.error("Gerade: Objekt '" + arg2 + "' nicht gefunden.")
+      return null
+    }
+  } else if (Array.isArray(arg2) && arg2.length === 2) {
+    // Variante 3: Zweiter Parameter als Richtungsvektor (direkt als Array)
+    directionVector = arg2
+  } else {
+    console.error(
+      'Gerade: Ungültiger zweiter Parameter. Erwarte einen Punkt, eine Gerade oder einen Richtungsvektor.'
+    )
+    return null
+  }
+
+  // Nun: Bestimme zwei Punkte (endP1 und endP2), die die Gerade innerhalb der Achsengrenzen definieren.
+  const axMinX =
+    typeof globalAxisLimits.minX === 'number' ? globalAxisLimits.minX : -10
+  const axMaxX =
+    typeof globalAxisLimits.maxX === 'number' ? globalAxisLimits.maxX : 10
+  const axMinY =
+    typeof globalAxisLimits.minY === 'number' ? globalAxisLimits.minY : -10
+  const axMaxY =
+    typeof globalAxisLimits.maxY === 'number' ? globalAxisLimits.maxY : 10
+
+  let endP1, endP2
+  if (secondPoint) {
+    // Variante 1: Zwei Punkte
+    // Erzeuge die Gerade durch p und secondPoint.
+    if (Math.abs(p[0] - secondPoint[0]) < 1e-9) {
+      // Vertikale Gerade
+      endP1 = [p[0], axMinY]
+      endP2 = [p[0], axMaxY]
+    } else {
+      const m = (secondPoint[1] - p[1]) / (secondPoint[0] - p[0])
+      const b = p[1] - m * p[0]
+      let candidates = []
+      const yAtMinX = m * axMinX + b
+      if (yAtMinX >= axMinY && yAtMinX <= axMaxY)
+        candidates.push([axMinX, yAtMinX])
+      const yAtMaxX = m * axMaxX + b
+      if (yAtMaxX >= axMinY && yAtMaxX <= axMaxY)
+        candidates.push([axMaxX, yAtMaxX])
+      if (Math.abs(m) > 1e-9) {
+        const xAtMinY = (axMinY - b) / m
+        if (xAtMinY >= axMinX && xAtMinY <= axMaxX)
+          candidates.push([xAtMinY, axMinY])
+        const xAtMaxY = (axMaxY - b) / m
+        if (xAtMaxY >= axMinX && xAtMaxY <= axMaxX)
+          candidates.push([xAtMaxY, axMaxY])
+      }
+      // Entferne Duplikate
+      let uniqueCandidates = []
+      candidates.forEach((pt) => {
+        if (
+          !uniqueCandidates.some(
+            (u) =>
+              Math.abs(u[0] - pt[0]) < 1e-9 && Math.abs(u[1] - pt[1]) < 1e-9
+          )
+        ) {
+          uniqueCandidates.push(pt)
+        }
+      })
+      if (uniqueCandidates.length < 2) {
+        console.error(
+          'Gerade: Es konnten nicht genügend Schnittpunkte gefunden werden.'
+        )
+        return null
+      }
+      uniqueCandidates.sort((a, b) => a[0] - b[0])
+      endP1 = uniqueCandidates[0]
+      endP2 = uniqueCandidates[uniqueCandidates.length - 1]
+    }
+  } else if (directionVector) {
+    // Variante 2/3: Die Gerade wird durch den Startpunkt p und einen Richtungsvektor definiert.
+    const vx = directionVector[0],
+      vy = directionVector[1]
+    if (Math.abs(vx) < 1e-9 && Math.abs(vy) < 1e-9) {
       console.error(
-        'Gerade: Es konnten nicht genügend Schnittpunkte mit den Achsen ermittelt werden.'
+        'Gerade: Der Richtungsvektor darf nicht der Nullvektor sein.'
       )
       return null
     }
-    uniqueCandidates.sort((a, b) => a[0] - b[0])
-    endP1 = uniqueCandidates[0]
-    endP2 = uniqueCandidates[uniqueCandidates.length - 1]
+    if (Math.abs(vx) < 1e-9) {
+      // Vertikale Gerade
+      endP1 = [p[0], axMinY]
+      endP2 = [p[0], axMaxY]
+    } else {
+      const m = vy / vx
+      const b = p[1] - m * p[0]
+      let candidates = []
+      const yAtMinX = m * axMinX + b
+      if (yAtMinX >= axMinY && yAtMinX <= axMaxY)
+        candidates.push([axMinX, yAtMinX])
+      const yAtMaxX = m * axMaxX + b
+      if (yAtMaxX >= axMinY && yAtMaxX <= axMaxY)
+        candidates.push([axMaxX, yAtMaxX])
+      if (Math.abs(m) > 1e-9) {
+        const xAtMinY = (axMinY - b) / m
+        if (xAtMinY >= axMinX && xAtMinY <= axMaxX)
+          candidates.push([xAtMinY, axMinY])
+        const xAtMaxY = (axMaxY - b) / m
+        if (xAtMaxY >= axMinX && xAtMaxY <= axMaxX)
+          candidates.push([xAtMaxY, axMaxY])
+      }
+      let uniqueCandidates = []
+      candidates.forEach((pt) => {
+        if (
+          !uniqueCandidates.some(
+            (u) =>
+              Math.abs(u[0] - pt[0]) < 1e-9 && Math.abs(u[1] - pt[1]) < 1e-9
+          )
+        ) {
+          uniqueCandidates.push(pt)
+        }
+      })
+      if (uniqueCandidates.length < 2) {
+        console.error(
+          'Gerade: Es konnten nicht genügend Schnittpunkte gefunden werden.'
+        )
+        return null
+      }
+      uniqueCandidates.sort((a, b) => a[0] - b[0])
+      endP1 = uniqueCandidates[0]
+      endP2 = uniqueCandidates[uniqueCandidates.length - 1]
+    }
+  } else {
+    console.error('Gerade: Unbekannter Fall.')
+    return null
   }
-  let index = 1
+
+  // Erzeuge einen Namen, falls keiner angegeben wurde.
   if (!name) {
+    let index = 1
     while (objects['Gerade' + index]) index++
     name = 'Gerade' + index
   } else if (objects[name]) {
-    console.error(`Gerade: Element "${name}" existiert bereits.`)
+    console.error("Gerade: Element '" + name + "' existiert bereits.")
     return name
   }
+
+  // Lege die Gerade im gemeinsamen Dictionary ab.
   objects[name] = {
     type: 'line',
     data: [endP1, endP2],
     style: { lineColor: '#00F', lineWidth: 2, lineType: 'dashed' },
     tooltip: `<strong>${name}</strong><br>Schnittpunkt 1: (${endP1[0]}, ${endP1[1]})<br>Schnittpunkt 2: (${endP2[0]}, ${endP2[1]})`,
   }
+
   return name
+}
+
+function Vieleck(...args) {
+  let vertices = []
+
+  // Hilfsfunktion zur Berechnung des Abstands zwischen zwei Punkten
+  function dist(p1, p2) {
+    return Math.sqrt((p1[0] - p2[0]) ** 2 + (p1[1] - p2[1]) ** 2)
+  }
+
+  // Variante 1: Vieleck( <Liste von Punkten> )
+  if (args.length === 1 && Array.isArray(args[0])) {
+    vertices = args[0]
+  }
+  // Variante 2: Vieleck( <Punkt>, <Punkt>, <Anzahl der Ecken> )
+  else if (args.length === 3 && typeof args[2] === 'number') {
+    let center = getCoord(args[0])
+    let vertex = getCoord(args[1])
+    let n = args[2]
+    if (!center || !vertex) {
+      console.error('Vieleck: Ungültige Punkte für das regelmäßige Vieleck.')
+      return null
+    }
+    let radius = dist(center, vertex)
+    let startAngle = Math.atan2(vertex[1] - center[1], vertex[0] - center[0])
+    vertices = []
+    for (let i = 0; i < n; i++) {
+      let angle = startAngle + (2 * Math.PI * i) / n
+      vertices.push([
+        center[0] + radius * Math.cos(angle),
+        center[1] + radius * Math.sin(angle),
+      ])
+    }
+  }
+  // Variante 3: Vieleck( <Punkt>, <Punkt>, <Anzahl der Ecken n>, <Richtung> )
+  else if (args.length === 4 && typeof args[2] === 'number') {
+    let center = getCoord(args[0])
+    let vertex = getCoord(args[1])
+    let n = args[2]
+    let direction = args[3] // Erwartet einen Vektor, z. B. [vx, vy]
+    if (!center || !vertex) {
+      console.error('Vieleck: Ungültige Punkte für das regelmäßige Vieleck.')
+      return null
+    }
+    if (!Array.isArray(direction) || direction.length !== 2) {
+      console.error(
+        'Vieleck: Der Richtungsparameter muss ein Vektor [vx, vy] sein.'
+      )
+      return null
+    }
+    let radius = dist(center, vertex)
+    // Bestimme den gewünschten Startwinkel aus dem Richtungsvektor
+    let desiredAngle = Math.atan2(direction[1], direction[0])
+    vertices = []
+    for (let i = 0; i < n; i++) {
+      let angle = desiredAngle + (2 * Math.PI * i) / n
+      vertices.push([
+        center[0] + radius * Math.cos(angle),
+        center[1] + radius * Math.sin(angle),
+      ])
+    }
+  }
+  // Variante 4: Vieleck( <Punkt>, …, <Punkt> ) – alle Parameter sind Punkte
+  else if (args.length >= 3 && typeof args[args.length - 1] !== 'number') {
+    vertices = args
+  } else {
+    console.error('Vieleck: Ungültige Parameter.')
+    return null
+  }
+
+  // Falls einzelne Punkte als String (Name) übergeben wurden, wandelt getCoord sie in Koordinaten um.
+  vertices = vertices.map((pt) => getCoord(pt) || pt)
+
+  // Schließe das Polygon, falls der erste und der letzte Punkt nicht identisch sind.
+  if (vertices.length > 0) {
+    let first = vertices[0]
+    let last = vertices[vertices.length - 1]
+    if (
+      Math.abs(first[0] - last[0]) > 1e-9 ||
+      Math.abs(first[1] - last[1]) > 1e-9
+    ) {
+      vertices.push(first)
+    }
+  }
+
+  // Erzeuge einen eindeutigen Namen für das Vieleck
+  let index = 1
+  let polyName = 'Vieleck' + index
+  while (objects[polyName]) {
+    index++
+    polyName = 'Vieleck' + index
+  }
+
+  objects[polyName] = {
+    type: 'polygon',
+    data: vertices,
+    style: {
+      lineColor: '#0A0',
+      lineWidth: 2,
+      lineType: 'solid',
+      fillColor: 'rgba(0,170,0,0.3)',
+    },
+    tooltip: `<strong>${polyName}</strong>`,
+  }
+
+  return polyName
 }
 
 // ------------------------------------------------------------
@@ -866,24 +1102,65 @@ function Abstand(obj1, obj2) {
 // Funktion: Vektor
 // Zeichnet einen Vektor zwischen zwei Punkten.
 // ------------------------------------------------------------
-function Vektor(startpunkt, endpunkt, name = null) {
-  const start = getCoord(startpunkt)
-  const end = getCoord(endpunkt)
-  if (!start || !end) {
-    console.error('Vektor: Ungültige Punkte.')
-    return null
+function Vektor(arg1, arg2, name = null) {
+  let start, end
+
+  // Variante 1: Nur ein Argument → Ortsvektor vom Ursprung [0,0] zum Punkt
+  if (arguments.length === 1) {
+    start = [0, 0]
+    end = getCoord(arg1)
+    if (!end) {
+      console.error('Vektor: Ungültiger Punkt für den Ortsvektor.')
+      return null
+    }
+    if (!name) {
+      let index = 1
+      while (objects['Vektor' + index]) index++
+      name = 'Vektor' + index
+    }
   }
-  let index = 1
-  if (!name) {
-    while (objects['Vektor' + index]) index++
-    name = 'Vektor' + index
-  } else if (objects[name]) {
-    console.error(`Vektor: Element "${name}" existiert bereits.`)
-    return name
+  // Variante 2: Zwei Argumente
+  else if (arguments.length === 2) {
+    // Prüfe, ob der zweite Parameter als Punkt vorhanden ist:
+    if (typeof arg2 === 'string' && !objects.hasOwnProperty(arg2)) {
+      // Falls "arg2" (z. B. "V1") noch nicht existiert, wird es als Name interpretiert.
+      start = [0, 0]
+      end = getCoord(arg1)
+      if (!end) {
+        console.error('Vektor: Ungültiger Punkt für den Ortsvektor.')
+        return null
+      }
+      name = arg2
+    } else {
+      // Sonst: Beide Parameter sind Punkte (bekannter Punkt oder Koordinate)
+      start = getCoord(arg1)
+      end = getCoord(arg2)
+      if (!start || !end) {
+        console.error('Vektor: Ungültige Punkte für Anfangs- oder Endpunkt.')
+        return null
+      }
+      if (!name) {
+        let index = 1
+        while (objects['Vektor' + index]) index++
+        name = 'Vektor' + index
+      }
+    }
   }
+  // Variante 3: Drei Argumente (explizit Anfangs- und Endpunkt plus Name)
+  else if (arguments.length === 3) {
+    start = getCoord(arg1)
+    end = getCoord(arg2)
+    if (!start || !end) {
+      console.error('Vektor: Ungültige Punkte für Anfangs- oder Endpunkt.')
+      return null
+    }
+    // Der dritte Parameter wird als Name verwendet.
+  }
+
   const dx = end[0] - start[0],
-    dy = end[1] - start[1]
-  const length = Math.sqrt(dx * dx + dy * dy)
+    dy = end[1] - start[1],
+    length = Math.sqrt(dx * dx + dy * dy)
+
   objects[name] = {
     type: 'line',
     data: [start, end],
@@ -894,6 +1171,7 @@ function Vektor(startpunkt, endpunkt, name = null) {
       2
     )}<br>Richtung: (${dx.toFixed(2)}, ${dy.toFixed(2)})`,
   }
+
   return name
 }
 
@@ -1256,8 +1534,20 @@ function GBScript_render(userAxisLimits = {}) {
   const option = {
     title: titleObj,
     tooltip: { trigger: 'item' },
-    xAxis: { type: 'value', min: minX, max: maxX, splitLine: { show: false } },
-    yAxis: { type: 'value', min: minY, max: maxY, splitLine: { show: false } },
+    xAxis: {
+      type: 'value',
+      min: minX,
+      max: maxX,
+      splitLine: { show: false },
+      show: diagrammAktiv,
+    },
+    yAxis: {
+      type: 'value',
+      min: minY,
+      max: maxY,
+      splitLine: { show: false },
+      show: diagrammAktiv,
+    },
     series: series,
   }
   return toSource(option)
