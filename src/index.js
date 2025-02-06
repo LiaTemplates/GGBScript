@@ -678,48 +678,121 @@ function Schnittpunkt(gerade1, gerade2, name = null) {
   return schnittpunktName
 }
 
-// Abstand zwischen zwei Punkten
-function Abstand(punkt1, punkt2) {
-  const p1 = getCoord(punkt1)
-  const p2 = getCoord(punkt2)
+function Abstand(obj1, obj2) {
+  const getDistance = (p1, p2) =>
+    Math.sqrt(Math.pow(p2[0] - p1[0], 2) + Math.pow(p2[1] - p1[1], 2)).toFixed(
+      2
+    )
 
-  if (!p1 || !p2) {
-    console.error('Abstand: Ungültige Punkte.')
-    return null
+  const p1 = getCoord(obj1)
+  const p2 = getCoord(obj2)
+
+  if (p1 && p2) {
+    const dist = getDistance(p1, p2)
+    const lineName = `Lineal_${obj1}_${obj2}`
+    const textName = `Abstand_${obj1}_${obj2}`
+
+    series.push({
+      name: lineName,
+      type: 'line',
+      coordinateSystem: 'cartesian2d',
+      data: [p1, p2],
+      lineStyle: { color: '#000', width: 1, type: 'dashed' },
+    })
+
+    series.push({
+      name: textName,
+      type: 'scatter',
+      coordinateSystem: 'cartesian2d',
+      data: [[(p1[0] + p2[0]) / 2, (p1[1] + p2[1]) / 2]],
+      symbolSize: 0,
+      label: {
+        show: true,
+        formatter: `${dist}`,
+        position: 'top',
+        fontSize: 14,
+        color: '#000',
+      },
+    })
+    return dist
   }
 
-  const dist = Math.sqrt(
-    Math.pow(p2[0] - p1[0], 2) + Math.pow(p2[1] - p1[1], 2)
-  ).toFixed(2)
-  const lineName = `Lineal_${punkt1}_${punkt2}`
-  const textName = `Abstand_${punkt1}_${punkt2}`
+  const g1 = series.find((s) => s.name === obj1)
+  const g2 = series.find((s) => s.name === obj2)
 
-  // Zeichne eine Linie zwischen den Punkten (Lineal)
-  series.push({
-    name: lineName,
-    type: 'line',
-    coordinateSystem: 'cartesian2d',
-    data: [p1, p2],
-    lineStyle: { color: '#000', width: 1, type: 'dashed' },
-  })
+  if (g1 && g2) {
+    const [[x1, y1], [x2, y2]] = g1.data
+    const [[x3, y3], [x4, y4]] = g2.data
 
-  // Füge den Abstand als Text hinzu
-  series.push({
-    name: textName,
-    type: 'scatter',
-    coordinateSystem: 'cartesian2d',
-    data: [[(p1[0] + p2[0]) / 2, (p1[1] + p2[1]) / 2]],
-    symbolSize: 0,
-    label: {
-      show: true,
-      formatter: `${dist}`,
-      position: 'top',
-      fontSize: 14,
-      color: '#000',
-    },
-  })
+    const denominator = Math.abs((y4 - y3) * (x2 - x1) - (x4 - x3) * (y2 - y1))
+    if (denominator === 0) {
+      console.error('Abstand zwischen parallelen Geraden nicht definiert.')
+      return null
+    }
 
-  return dist
+    const numerator = Math.abs((x3 - x1) * (y2 - y1) - (y3 - y1) * (x2 - x1))
+    const dist = (numerator / denominator).toFixed(2)
+
+    series.push({
+      name: `Abstand_${obj1}_${obj2}`,
+      type: 'scatter',
+      coordinateSystem: 'cartesian2d',
+      data: [[(x1 + x3) / 2, (y1 + y3) / 2]],
+      symbolSize: 0,
+      label: {
+        show: true,
+        formatter: `${dist}`,
+        position: 'top',
+        fontSize: 14,
+        color: '#000',
+      },
+    })
+
+    return dist
+  }
+
+  if (g1 && p2) {
+    const [[x1, y1], [x2, y2]] = g1.data
+    const x0 = p2[0],
+      y0 = p2[1]
+
+    const numerator = Math.abs(
+      (y2 - y1) * x0 - (x2 - x1) * y0 + x2 * y1 - y2 * x1
+    )
+    const denominator = Math.sqrt(Math.pow(y2 - y1, 2) + Math.pow(x2 - x1, 2))
+    const dist = (numerator / denominator).toFixed(2)
+
+    const lotX = (x1 + x2) / 2
+    const lotY = (y1 + y2) / 2
+
+    series.push({
+      name: `Lot_${obj1}_${obj2}`,
+      type: 'line',
+      coordinateSystem: 'cartesian2d',
+      data: [p2, [lotX, lotY]],
+      lineStyle: { color: '#A0A', width: 2, type: 'dashed' },
+    })
+
+    series.push({
+      name: `Abstand_${obj1}_${obj2}`,
+      type: 'scatter',
+      coordinateSystem: 'cartesian2d',
+      data: [[(p2[0] + lotX) / 2, (p2[1] + lotY) / 2]],
+      symbolSize: 0,
+      label: {
+        show: true,
+        formatter: `${dist}`,
+        position: 'top',
+        fontSize: 14,
+        color: '#000',
+      },
+    })
+
+    return dist
+  }
+
+  console.error('Abstand: Ungültige Eingabe.')
+  return null
 }
 
 function Vektor(startpunkt, endpunkt, name = null) {
@@ -910,8 +983,46 @@ function Lot(punkt, gerade, name = null) {
   return lotName
 }
 
+function Text(position, textContent, name = null) {
+  const coord = getCoord(position)
+  if (!coord) {
+    console.error(`Text: Ungültige Position "${position}".`)
+    return null
+  }
+
+  let textName = name || `Text${series.length + 1}`
+
+  series.push({
+    name: textName,
+    type: 'scatter',
+    coordinateSystem: 'cartesian2d',
+    data: [coord],
+    symbolSize: 0, // Unsichtbarer Punkt als Anker für den Text
+    label: {
+      show: true,
+      formatter: textContent,
+      position: 'top', // Text über dem Punkt platzieren
+      rich: {
+        bold: { fontWeight: 'bold' },
+      },
+      backgroundColor: 'rgba(255,255,255,0.8)', // Leicht transparente Hintergrundfarbe
+      padding: [4, 6], // Etwas Abstand um den Text
+      borderRadius: 4, // Abgerundete Ecken
+      borderWidth: 1,
+      borderColor: '#ccc',
+      fontSize: 14,
+      lineHeight: 18,
+    },
+    tooltip: {
+      show: false,
+    },
+  })
+
+  return textName
+}
+
 // Parallele Gerade durch einen Punkt
-function Parallel(punkt, gerade, name = null) {
+function Parallele(punkt, gerade, name = null) {
   const p = getCoord(punkt)
   const g = series.find((s) => s.name === gerade)
 

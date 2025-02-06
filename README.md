@@ -138,6 +138,21 @@ const P2 = Verschiebung(P, @input(`x`), @input(`y`), "P2");
 Farbe(P2, "lightblue");
 ```
 
+## Parallele
+
+``` js @GGBScript
+// Definiere Punkte
+let A = Punkt(1, 2, "A");
+let B = Punkt(4, 6, "B");
+let C = Punkt(2, 5, "C");
+
+// Erzeuge eine Gerade
+let g = Gerade(A, B, "g");
+
+// Erzeuge eine Parallele
+let p = Parallele(C, g, "p");
+```
+
 ## Mittelpunkt
 
 A = (<script input="range" min="0" max="100" value="1" step="1" default="1" output="A0">
@@ -176,6 +191,23 @@ let M = Mittelpunkt(A, B, C);
 
 // Berechne den Abstand der Geraden
 let d = Abstand(M, D);
+```
+
+---
+
+``` js @GGBScript
+// Definiere Punkte
+let A = Punkt(1, 2, "A");
+let B = Punkt(4, 6, "B");
+let C = Punkt(2, 5, "C");
+let D = Punkt(6, 3, "D");
+
+// Erzeuge zwei Geraden
+let g1 = Line(A, B, "g1");
+let g2 = Strecke(C, D, "g2");
+
+// Berechne den Abstand der Geraden
+let d = Abstand(g1, g2);
 ```
 
 
@@ -225,6 +257,16 @@ let G = Gerade(A, B, "G");
 
 // Erzeuge ein Lot
 let L = Lot(C, G, "L");
+```
+
+## Text
+
+``` js @GGBScript
+// Definiere einen Punkt
+let A = Punkt(1, 2, "A");
+
+// Erzeuge einen Text
+let T = Text([1,2.3], "Text");
 ```
 
 
