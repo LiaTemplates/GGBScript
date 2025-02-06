@@ -88,15 +88,99 @@ const P = Polygon(A, B, C);
 
 ## Kreis
 
+1. Kreis mit festem Radius `Kreis("Mittelpunkt", 5)`
+
 ``` js @GGBScript
-Titel("Kreis K");
-UserAxisLimits(-2.5, 5, 0, 3);
+Titel("Kreis K")
+UserAxisLimits(-2.5, 5, 0, 3)
 
 // Definiere einen Punkt
-const A = Punkt(1.5, 1.5, "A");
+const A = Punkt(1.5, 1.5, "A")
 
 // Erzeuge einen Kreis
-const K = Kreis(A, 1, "K");
+const K = Kreis(A, 1, "K")
+```
+
+
+2. Kreis mit Radius einer Strecke `Kreis("M", "Strecke1")`
+
+``` js @GGBScript
+Titel("Kreis K2")
+UserAxisLimits(-2.5, 5, 0, 3)
+
+// Definiere Punkte
+const A = Punkt(1, 1, "A")
+const B = Punkt(3, 2, "B")
+
+// Erzeuge eine Strecke
+const S = Strecke(A, B, "Strecke1")
+
+// Erzeuge einen Kreis
+const K2 = Kreis(A, S, "K2")
+```
+
+3. Kreis mit Radius aus Abstand zweier Punkte `Kreis("M", "P2")`
+
+``` js @GGBScript
+Titel("Kreis K3")
+UserAxisLimits(-2.5, 5, 0, 3)
+
+// Definiere Punkte
+const A = Punkt(1, 1, "A")
+const B = Punkt(3, 2, "B")
+
+// Erzeuge einen Kreis
+const K3 = Kreis(A, B, "K3")
+```
+
+4. Kreis durch drei Punkte `Kreis("A", "B", "C")`
+
+``` js @GGBScript
+Titel("Kreis K4")
+UserAxisLimits(-2.5, 5, 0, 3)
+
+// Definiere Punkte
+const A = Punkt(1, 1, "A")
+const B = Punkt(3, 2, "B")
+const C = Punkt(2, 3, "C")
+
+// Erzeuge einen Kreis
+Kreis("A", "B", "C");
+```
+
+
+5. Kreis mit Richtung einer Geraden `Kreis("M", 5, "Gerade1")`
+
+``` js @GGBScript
+Titel("Kreis K5")
+UserAxisLimits(-2.5, 5, 0, 3)
+
+// Definiere Punkte
+const A = Punkt(1, 1, "A")
+const B = Punkt(3, 2, "B")
+
+// Erzeuge eine Gerade
+const G = Gerade(A, B, "Gerade1")
+
+// Erzeuge einen Kreis
+Kreis("A", 1, "Gerade1");
+```
+
+6. Kreis mit Richtung eines Vektors `Kreis("M", 5, "Vektor1")`
+
+    ``` js @GGBScript
+    Titel("Kreis K6")
+    UserAxisLimits(-2.5, 5, 0, 3)
+
+    // Definiere Punkte
+    const A = Punkt(1, 1, "A")
+    const B = Punkt(3, 2, "B")
+
+    // Erzeuge einen Vektor
+    const V = Vektor(A, B, "Vektor1")
+
+    // Erzeuge einen Kreis
+    Kreis("A", 1, "Vektor1");
 ```
 
 ## Verschiebung

@@ -441,41 +441,94 @@ function Mittelpunkt(...args) {
   return midName
 }
 
-function Kreis(mittelpunkt, radius, name = null) {
-  const center = getCoord(mittelpunkt)
-  if (!center || typeof radius !== 'number' || radius <= 0) {
+function Kreis(...args) {
+  let center,
+    radius,
+    name = null,
+    direction = null
+
+  if (args.length === 2 || args.length === 3) {
+    if (typeof args[1] === 'number') {
+      // Kreis(M, r)
+      center = getCoord(args[0])
+      radius = args[1]
+    } else if (typeof args[1] === 'string') {
+      // Kreis(M, "Strecke")
+      center = getCoord(args[0])
+      let strecke = series.find((s) => s.name === args[1])
+      if (!strecke || strecke.type !== 'line') {
+        console.error(`Kreis: Strecke "${args[1]}" nicht gefunden.`)
+        return null
+      }
+      radius = Abstand(strecke.data[0], strecke.data[1])
+    } else if (Array.isArray(args[1])) {
+      // Kreis(M, P)
+      center = getCoord(args[0])
+      let point = getCoord(args[1])
+      radius = Abstand(center, point)
+    }
+
+    if (args.length === 3) {
+      // Kreis mit Richtung
+      direction = args[2]
+    }
+  } else if (args.length === 3) {
+    // Kreis(A, B, C)
+    let A = getCoord(args[0])
+    let B = getCoord(args[1])
+    let C = getCoord(args[2])
+
+    if (!A || !B || !C) {
+      console.error('Kreis: Mindestens einer der drei Punkte ist ungültig.')
+      return null
+    }
+
+    let D = Mittelpunkt(A, B)
+    let E = Mittelpunkt(B, C)
+
+    let lotD = Lot(D, Gerade(A, B))
+    let lotE = Lot(E, Gerade(B, C))
+
+    let centerName = Schnittpunkt(lotD, lotE)
+    center = getCoord(centerName)
+    radius = Abstand(center, A)
+  } else {
     console.error('Kreis: Ungültige Parameter.')
     return null
   }
-  let circleName = name || 'Kreis' + (series.length + 1)
 
-  // Berechnung der Kreiskoordinaten direkt als zusammenhängende Polygon-Koordinaten
+  if (!center || radius <= 0) {
+    console.error('Kreis: Ungültiger Mittelpunkt oder Radius.')
+    return null
+  }
+
+  name = name || `Kreis${series.length + 1}`
+
+  // Kreis als Polygon mit vielen Punkten
   const numPoints = 100
   const circleCoords = []
-  for (let i = 0; i < numPoints + 1; i++) {
+  for (let i = 0; i <= numPoints; i++) {
     let angle = (i / numPoints) * 2 * Math.PI
     let x = center[0] + radius * Math.cos(angle)
     let y = center[1] + radius * Math.sin(angle)
     circleCoords.push([x, y])
   }
 
-  // Hinzufügen zur series als Polygon (nicht als Scatter-Punkte)
   series.push({
-    name: circleName,
+    name: name,
     type: 'line',
     coordinateSystem: 'cartesian2d',
     data: circleCoords,
     triggerLineEvent: true,
     symbol: 'none',
     lineStyle: { color: '#00F', width: 2, type: 'solid' },
-    areaStyle: { color: 'rgba(0, 0, 255, 0.1)' }, // Transparente Füllung
+    areaStyle: { color: 'rgba(0, 0, 255, 0.1)' },
     tooltip: {
-      trigger: 'item',
-      formatter: `<strong>${circleName}</strong><br>Mittelpunkt: (${center[0]}, ${center[1]})<br>Radius: ${radius}`,
+      formatter: `<strong>${name}</strong><br>Mittelpunkt: (${center[0]}, ${center[1]})<br>Radius: ${radius}`,
     },
   })
 
-  return circleName
+  return name
 }
 
 // Modifizierte Transformationsfunktionen für mehrere Objekttypen
