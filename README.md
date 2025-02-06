@@ -181,7 +181,21 @@ Kreis("A", 1, "Gerade1");
 
     // Erzeuge einen Kreis
     Kreis("A", 1, "Vektor1");
+    ```
+
+## Ellipse
+
+1. Ellipse mit festem Radius `Ellipse("Mittelpunkt", 5, 3)`
+
+``` js @GGBScript
+Titel("Ellipse E")
+// UserAxisLimits(-2.5, 5, 0, 3)
+// Definiert einen Mittelpunkt "M1"
+Punkt(0, 0, "M1");
+// Erzeugt eine Ellipse mit Mittelpunkt "M1", horizontaler Halbachse 5, vertikaler Halbachse 3 und Rotation 30°:
+Ellipse("M1", 5, 3);
 ```
+
 
 ## Verschiebung
 

@@ -1,13 +1,11 @@
 'use strict'
 
-// ------------------------------------------------------------
-// Globale Variablen
-// ------------------------------------------------------------
-let points = {} // Alle mittels Punkt() definierten Punkte: { name: [x,y], ... }
-let pointStyles = {} // Zusätzliche Eigenschaften für Punkte, z.B. Farbe
-let series = [] // Linienserien, die (auch) Platzhalterkoordinaten enthalten können
+/* ============================================================
+   Globale Variablen & Initialisierung
+   ============================================================ */
+let objects = {} // Gemeinsames Dictionary für alle Objekte (Punkte, Linien, etc.)
 let TITLE = '' // Diagrammtitel (optional)
-let globalAxisLimits = {} // Globale Achsenlimits, die per UserAxisLimits() gesetzt werden
+let globalAxisLimits = {} // Globale Achsenlimits
 
 // ------------------------------------------------------------
 // Hilfsfunktion: Serialisierung (inkl. Funktionen)
@@ -34,74 +32,31 @@ function toSource(obj) {
 
 // ------------------------------------------------------------
 // Funktion: GBScript_init
-// Initialisiert die globalen Variablen
+// Setzt das Objekt-Dictionary sowie alle globalen Variablen zurück.
 // ------------------------------------------------------------
 function GBScript_init() {
-  points = {}
-  pointStyles = {}
-  series = []
+  objects = {}
   TITLE = ''
   globalAxisLimits = {}
 }
 
 // ------------------------------------------------------------
 // Globale Funktion: UserAxisLimits
-// Mit dieser Funktion können die Achsenlimits global gesetzt werden,
-// ähnlich wie in GeoGebraScript. Die übergebenen Werte überschreiben
-// die automatisch berechneten Achsenlimits.
+// Mit dieser Funktion können die Achsenlimits global gesetzt werden.
 // ------------------------------------------------------------
 function UserAxisLimits(minX, maxX, minY, maxY) {
   globalAxisLimits = { minX, maxX, minY, maxY }
 }
 
-// ------------------------------------------------------------
-// Funktion: Punkt
-// Erstellt einen Punkt.
-// Akzeptiert:
-//    Punkt(x, y, name?) oder Punkt([x, y], name?)
-// ------------------------------------------------------------
-function Punkt(x, y = null, name = null) {
-  let coords, pointName
-  if (Array.isArray(x) && x.length === 2) {
-    coords = x
-    if (typeof y === 'string') {
-      name = y
-    }
-  } else if (typeof x === 'number' && typeof y === 'number') {
-    coords = [x, y]
-  } else {
-    console.error(`Punkt: Ungültige Argumente (${x}, ${y})`)
-    return null
-  }
-  if (name) {
-    if (points[name]) {
-      console.error(`Punkt "${name}" existiert bereits.`)
-      return name
-    }
-    pointName = name
-  } else {
-    let index = 1
-    while (points['P' + index]) {
-      index++
-    }
-    pointName = 'P' + index
-  }
-  points[pointName] = coords
-  // Standardfarbe für Punkte (wird im Render dann einzeln berücksichtigt)
-  pointStyles[pointName] = { color: 'red' }
-  return pointName
-}
+/* ============================================================
+   Hilfsfunktionen
+   ============================================================ */
 
-// ------------------------------------------------------------
-// Hilfsfunktion: getCoord
 // Gibt zu einem Argument (String oder [x,y]) die Koordinaten zurück.
-// Wird in den Funktionen Linie, Strecke, Gerade, Polygon und Mittelpunkt verwendet.
-// Falls ein String übergeben wird, wird in der globalen Punkte-Sammlung
-// nach einem entsprechenden Punkt gesucht.
-// ------------------------------------------------------------
+// Wird z. B. von Punkt, Linie, etc. benötigt.
 function getCoord(arg) {
   if (typeof arg === 'string') {
-    if (points[arg]) return points[arg]
+    if (objects[arg] && objects[arg].type === 'point') return objects[arg].coord
     else {
       console.error(`getCoord: Punkt "${arg}" ist nicht definiert.`)
       return null
@@ -116,6 +71,43 @@ function getCoord(arg) {
   }
 }
 
+/* ============================================================
+   Funktionen zur Objekterzeugung
+   ============================================================ */
+
+// ------------------------------------------------------------
+// Funktion: Punkt
+// Erzeugt einen Punkt und speichert ihn im Dictionary.
+// Argumente: Punkt(x, y, name?) oder Punkt([x,y], name?)
+// ------------------------------------------------------------
+function Punkt(x, y = null, name = null) {
+  let coords, pointName
+  if (Array.isArray(x) && x.length === 2) {
+    coords = x
+    if (typeof y === 'string') {
+      name = y
+    }
+  } else if (typeof x === 'number' && typeof y === 'number') {
+    coords = [x, y]
+  } else {
+    console.error(`Punkt: Ungültige Argumente (${x}, ${y})`)
+    return null
+  }
+  if (!name) {
+    let index = 1
+    while (objects['P' + index]) index++
+    pointName = 'P' + index
+  } else {
+    if (objects[name]) {
+      console.error(`Punkt "${name}" existiert bereits.`)
+      return name
+    }
+    pointName = name
+  }
+  objects[pointName] = { type: 'point', coord: coords, style: { color: 'red' } }
+  return pointName
+}
+
 // ------------------------------------------------------------
 // Funktion: Linie
 // Zeichnet eine Linie zwischen zwei Punkten.
@@ -127,28 +119,28 @@ function Linie(arg1, arg2, name = null) {
     console.error('Linie: Mindestens einer der beiden Punkte ist ungültig.')
     return null
   }
-  let lineName = name || 'Linie' + (series.length + 1)
-  series.push({
-    name: lineName,
+  let index = 1
+  if (!name) {
+    while (objects['Linie' + index]) index++
+    name = 'Linie' + index
+  } else if (objects[name]) {
+    console.error(`Linie: Element "${name}" existiert bereits.`)
+    return name
+  }
+  objects[name] = {
     type: 'line',
-    coordinateSystem: 'cartesian2d',
     data: [coord1, coord2],
-    triggerLineEvent: true,
-    symbol: 'none',
-    lineStyle: { color: '#000', width: 2, type: 'solid' },
-    tooltip: {
-      trigger: 'axis',
-      formatter: `<strong>${lineName}</strong><br>Start: (${coord1[0]}, ${coord1[1]})<br>Ende: (${coord2[0]}, ${coord2[1]})`,
-    },
-  })
-  return lineName
+    style: { lineColor: '#000', lineWidth: 2, lineType: 'solid' },
+    tooltip: `<strong>${name}</strong><br>Start: (${coord1[0]}, ${coord1[1]})<br>Ende: (${coord2[0]}, ${coord2[1]})`,
+  }
+  return name
 }
 function Line(arg1, arg2, name = null) {
   return Linie(arg1, arg2, name)
 }
 
 // ------------------------------------------------------------
-// Globale Funktion: Strecke
+// Funktion: Strecke
 // Zeichnet einen Streckenabschnitt zwischen zwei Punkten.
 // ------------------------------------------------------------
 function Strecke(arg1, arg2, name = null) {
@@ -158,26 +150,26 @@ function Strecke(arg1, arg2, name = null) {
     console.error('Strecke: Mindestens einer der beiden Punkte ist ungültig.')
     return null
   }
-  let segName = name || 'Strecke' + (series.length + 1)
-  series.push({
-    name: segName,
+  let index = 1
+  if (!name) {
+    while (objects['Strecke' + index]) index++
+    name = 'Strecke' + index
+  } else if (objects[name]) {
+    console.error(`Strecke: Element "${name}" existiert bereits.`)
+    return name
+  }
+  objects[name] = {
     type: 'line',
-    coordinateSystem: 'cartesian2d',
     data: [coord1, coord2],
-    triggerLineEvent: true,
-    symbol: 'none',
-    lineStyle: { color: '#F00', width: 2, type: 'solid' },
-    tooltip: {
-      trigger: 'axis',
-      formatter: `<strong>${segName}</strong><br>Start: (${coord1[0]}, ${coord1[1]})<br>Ende: (${coord2[0]}, ${coord2[1]})`,
-    },
-  })
-  return segName
+    style: { lineColor: '#F00', lineWidth: 2, lineType: 'solid' },
+    tooltip: `<strong>${name}</strong><br>Start: (${coord1[0]}, ${coord1[1]})<br>Ende: (${coord2[0]}, ${coord2[1]})`,
+  }
+  return name
 }
 
 // ------------------------------------------------------------
-// Globale Funktion: Gerade
-// Zeichnet eine unendliche Gerade, die durch zwei Punkte definiert ist.
+// Funktion: Gerade
+// Zeichnet eine unendliche Gerade (als Strecke in den Achsenbegrenzungen).
 // ------------------------------------------------------------
 function Gerade(arg1, arg2, name = null) {
   const pt1 = getCoord(arg1),
@@ -187,13 +179,13 @@ function Gerade(arg1, arg2, name = null) {
     return null
   }
   let axMinX =
-    typeof globalAxisLimits.minX === 'number' ? globalAxisLimits.minX : -10
-  let axMaxX =
-    typeof globalAxisLimits.maxX === 'number' ? globalAxisLimits.maxX : 10
-  let axMinY =
-    typeof globalAxisLimits.minY === 'number' ? globalAxisLimits.minY : -10
-  let axMaxY =
-    typeof globalAxisLimits.maxY === 'number' ? globalAxisLimits.maxY : 10
+      typeof globalAxisLimits.minX === 'number' ? globalAxisLimits.minX : -10,
+    axMaxX =
+      typeof globalAxisLimits.maxX === 'number' ? globalAxisLimits.maxX : 10,
+    axMinY =
+      typeof globalAxisLimits.minY === 'number' ? globalAxisLimits.minY : -10,
+    axMaxY =
+      typeof globalAxisLimits.maxY === 'number' ? globalAxisLimits.maxY : 10
   let endP1, endP2
   if (pt1[0] === pt2[0]) {
     endP1 = [pt1[0], axMinY]
@@ -232,28 +224,26 @@ function Gerade(arg1, arg2, name = null) {
     endP1 = uniqueCandidates[0]
     endP2 = uniqueCandidates[uniqueCandidates.length - 1]
   }
-  let lineName = name || 'Gerade' + (series.length + 1)
-  series.push({
-    name: lineName,
+  let index = 1
+  if (!name) {
+    while (objects['Gerade' + index]) index++
+    name = 'Gerade' + index
+  } else if (objects[name]) {
+    console.error(`Gerade: Element "${name}" existiert bereits.`)
+    return name
+  }
+  objects[name] = {
     type: 'line',
-    coordinateSystem: 'cartesian2d',
     data: [endP1, endP2],
-    triggerLineEvent: true,
-    symbol: 'none',
-    lineStyle: { color: '#00F', width: 2, type: 'dashed' },
-    tooltip: {
-      trigger: 'axis',
-      formatter: `<strong>${lineName}</strong><br>Schnittpunkt 1: (${endP1[0]}, ${endP1[1]})<br>Schnittpunkt 2: (${endP2[0]}, ${endP2[1]})`,
-    },
-  })
-  return lineName
+    style: { lineColor: '#00F', lineWidth: 2, lineType: 'dashed' },
+    tooltip: `<strong>${name}</strong><br>Schnittpunkt 1: (${endP1[0]}, ${endP1[1]})<br>Schnittpunkt 2: (${endP2[0]}, ${endP2[1]})`,
+  }
+  return name
 }
 
 // ------------------------------------------------------------
-// Globale Funktion: Polygon
-// Zeichnet ein Polygon, das durch eine beliebige Anzahl von Punkten definiert wird.
-// Die Parameter können als Punktnamen (Strings) oder als [x, y]-Arrays übergeben werden.
-// Das Polygon wird geschlossen (erster Punkt wird am Ende erneut angehängt) und mit einer Fläche gefüllt.
+// Funktion: Polygon
+// Zeichnet ein Polygon (geschlossen) anhand beliebig vieler Punkte.
 // ------------------------------------------------------------
 function Polygon(...args) {
   if (args.length < 3) {
@@ -276,47 +266,39 @@ function Polygon(...args) {
   ) {
     polygonCoords.push(polygonCoords[0])
   }
-  let polyName = 'Polygon' + (series.length + 1)
-  series.push({
-    name: polyName,
-    type: 'line',
-    coordinateSystem: 'cartesian2d',
+  let index = 1
+  while (objects['Polygon' + index]) index++
+  let name = 'Polygon' + index
+  objects[name] = {
+    type: 'polygon',
     data: polygonCoords,
-    triggerLineEvent: true,
-    symbol: 'none',
-    lineStyle: { color: '#0A0', width: 2, type: 'solid' },
-    areaStyle: { color: 'rgba(0, 170, 0, 0.3)' },
-    tooltip: { trigger: 'item', formatter: `<strong>${polyName}</strong>` },
-  })
-  return polyName
+    style: {
+      lineColor: '#0A0',
+      lineWidth: 2,
+      lineType: 'solid',
+      fillColor: 'rgba(0,170,0,0.3)',
+    },
+    tooltip: `<strong>${name}</strong>`,
+  }
+  return name
 }
 
 // ------------------------------------------------------------
-// Globale Funktion: Mittelpunkt
-// Berechnet den Mittelpunkt. Je nach übergebener Parameterzahl gibt es zwei Fälle:
-// 1. Wenn nur ein einzelnes Argument übergeben wird, so wird angenommen, dass
-//    dieses der Name eines zuvor erzeugten Polygons ist. Der Schwerpunkt (Centroid)
-//    dieses Polygons wird berechnet.
-// 2. Bei zwei oder mehr Argumenten wird entweder der arithmetische Mittelwert zweier Punkte
-//    (bei genau 2 Argumenten) oder der Schwerpunkt (Centroid) eines Polygons (bei ≥ 3 Argumenten)
-//    anhand der übergebenen Punkte berechnet.
-// Das Ergebnis wird als neuer Punkt in der globalen Punkte-Sammlung gespeichert.
+// Funktion: Mittelpunkt
+// Berechnet den Schwerpunkt. Bei einem einzelnen Argument wird ein Polygon erwartet.
+// Bei zwei oder mehr Argumenten werden Punkte direkt gemittelt.
 // ------------------------------------------------------------
 function Mittelpunkt(...args) {
-  // Fall 1: Einzelnes Argument – es wird ein Polygon-Name erwartet.
+  // Fall 1: Einzelnes Argument – Polygonname
   if (args.length === 1) {
     let polyName = args[0]
-    // Suche in der Serie nach einem Objekt mit diesem Namen
-    let polyObj = series.find((item) => item.name === polyName)
-    if (!polyObj) {
+    if (!objects[polyName] || objects[polyName].type !== 'polygon') {
       console.error(
         `Mittelpunkt: Kein Polygon mit dem Namen "${polyName}" gefunden.`
       )
       return null
     }
-    // Nutze die in der Polygonserie gespeicherten Koordinaten
-    let vertices = polyObj.data.slice()
-    // Entferne das letzte Element, wenn es das gleiche wie das erste ist (doppelt)
+    let vertices = objects[polyName].data.slice()
     if (
       vertices.length > 1 &&
       vertices[0][0] === vertices[vertices.length - 1][0] &&
@@ -324,7 +306,6 @@ function Mittelpunkt(...args) {
     ) {
       vertices.pop()
     }
-    // Berechne den Schwerpunkt
     let area = 0,
       Cx = 0,
       Cy = 0
@@ -338,10 +319,9 @@ function Mittelpunkt(...args) {
       Cx += (x_i + x_next) * factor
       Cy += (y_i + y_next) * factor
     }
-    area = area / 2
+    area /= 2
     let centroid
     if (Math.abs(area) < 1e-9) {
-      // Degenerierter Fall: Fallback auf arithmetisches Mittel
       let sumX = 0,
         sumY = 0
       for (let i = 0; i < vertices.length; i++) {
@@ -350,21 +330,21 @@ function Mittelpunkt(...args) {
       }
       centroid = [sumX / vertices.length, sumY / vertices.length]
     } else {
-      Cx = Cx / (6 * area)
-      Cy = Cy / (6 * area)
+      Cx /= 6 * area
+      Cy /= 6 * area
       centroid = [Cx, Cy]
     }
-    // Erzeuge einen Namen für den neuen Punkt
     let index = 1
-    while (points['M' + index]) {
-      index++
-    }
+    while (objects['M' + index]) index++
     let midName = 'M' + index
-    points[midName] = centroid
-    pointStyles[midName] = { color: 'red' }
+    objects[midName] = {
+      type: 'point',
+      coord: centroid,
+      style: { color: 'red' },
+    }
     return midName
   }
-  // Fall 2: Zwei oder mehr Argumente – direkt anhand der übergebenen Punkte berechnen
+  // Fall 2: Zwei Argumente – arithmetisches Mittel zweier Punkte
   if (args.length === 2) {
     const p1 = getCoord(args[0]),
       p2 = getCoord(args[1])
@@ -374,18 +354,14 @@ function Mittelpunkt(...args) {
       )
       return null
     }
-    let mx = (p1[0] + p2[0]) / 2,
-      my = (p1[1] + p2[1]) / 2
+    let mid = [(p1[0] + p2[0]) / 2, (p1[1] + p2[1]) / 2]
     let index = 1
-    while (points['M' + index]) {
-      index++
-    }
+    while (objects['M' + index]) index++
     let midName = 'M' + index
-    points[midName] = [mx, my]
-    pointStyles[midName] = { color: 'red' }
+    objects[midName] = { type: 'point', coord: mid, style: { color: 'red' } }
     return midName
   }
-  // Bei drei oder mehr Argumenten: Berechne den Schwerpunkt (Centroid) eines Polygons.
+  // Fall 3: Drei oder mehr Argumente – Schwerpunkt eines Polygons
   let vertices = []
   for (let i = 0; i < args.length; i++) {
     let coord = getCoord(args[i])
@@ -395,7 +371,6 @@ function Mittelpunkt(...args) {
     }
     vertices.push(coord)
   }
-  // Schließe das Polygon falls nötig
   if (
     vertices[0][0] !== vertices[vertices.length - 1][0] ||
     vertices[0][1] !== vertices[vertices.length - 1][1]
@@ -415,7 +390,7 @@ function Mittelpunkt(...args) {
     Cx += (x_i + x_next) * factor
     Cy += (y_i + y_next) * factor
   }
-  area = area / 2
+  area /= 2
   let centroid
   if (Math.abs(area) < 1e-9) {
     let sumX = 0,
@@ -427,84 +402,157 @@ function Mittelpunkt(...args) {
     let n = vertices.length - 1
     centroid = [sumX / n, sumY / n]
   } else {
-    Cx = Cx / (6 * area)
-    Cy = Cy / (6 * area)
+    Cx /= 6 * area
+    Cy /= 6 * area
     centroid = [Cx, Cy]
   }
   let index = 1
-  while (points['M' + index]) {
-    index++
-  }
+  while (objects['M' + index]) index++
   let midName = 'M' + index
-  points[midName] = centroid
-  pointStyles[midName] = { color: 'red' }
+  objects[midName] = { type: 'point', coord: centroid, style: { color: 'red' } }
   return midName
 }
 
+function Ellipse(...args) {
+  let center,
+    rx,
+    ry,
+    rotation = 0
+
+  // Erwarte Parameter: Ellipse(Mittelpunkt, rx, ry) oder Ellipse(Mittelpunkt, rx, ry, rotation)
+  if (args.length === 3 || args.length === 4) {
+    center = getCoord(args[0])
+    if (!center) {
+      console.error('Ellipse: Ungültiger Mittelpunkt.')
+      return null
+    }
+    if (typeof args[1] !== 'number' || typeof args[2] !== 'number') {
+      console.error('Ellipse: rx und ry müssen Zahlen sein.')
+      return null
+    }
+    rx = args[1]
+    ry = args[2]
+    if (args.length === 4) {
+      if (typeof args[3] === 'number') {
+        rotation = args[3]
+      } else {
+        console.error('Ellipse: Der Rotationswinkel muss eine Zahl sein.')
+        return null
+      }
+    }
+  } else {
+    console.error(
+      'Ellipse: Ungültige Parameter. Erwarte Ellipse(M, rx, ry, [rotation]).'
+    )
+    return null
+  }
+
+  if (rx <= 0 || ry <= 0) {
+    console.error('Ellipse: rx und ry müssen positiv sein.')
+    return null
+  }
+
+  // Generiere einen eindeutigen Namen für die Ellipse
+  let index = 1
+  while (objects['Ellipse' + index]) index++
+  let name = 'Ellipse' + index
+
+  // Erzeuge die Punkte, die die Ellipse approximieren
+  const numPoints = 100
+  const ellipseCoords = []
+  const rotRad = (rotation * Math.PI) / 180 // Umrechnung des Rotationswinkels in Radianten
+  for (let i = 0; i <= numPoints; i++) {
+    let t = (i / numPoints) * 2 * Math.PI
+    // Punkt auf der Ellipse ohne Rotation:
+    let x = rx * Math.cos(t)
+    let y = ry * Math.sin(t)
+    // Rotation des Punktes:
+    let xRot = x * Math.cos(rotRad) - y * Math.sin(rotRad)
+    let yRot = x * Math.sin(rotRad) + y * Math.cos(rotRad)
+    // Translation zum Mittelpunkt:
+    ellipseCoords.push([center[0] + xRot, center[1] + yRot])
+  }
+
+  // Speichere die Ellipse als ein "line"-Objekt im globalen Dictionary
+  objects[name] = {
+    type: 'line',
+    data: ellipseCoords,
+    style: {
+      lineColor: '#800080', // Beispiel: lila Farbe
+      lineWidth: 2,
+      lineType: 'solid',
+      fillColor: 'rgba(128, 0, 128, 0.1)', // Transparente Füllung in lila
+    },
+    tooltip: `<strong>${name}</strong><br>Mittelpunkt: (${center[0]}, ${center[1]})<br>rx: ${rx}, ry: ${ry}<br>Rotation: ${rotation}°`,
+  }
+
+  return name
+}
+
+// ------------------------------------------------------------
+// Funktion: Kreis
+// Zeichnet einen Kreis – intern als Polygon approximiert.
+// ------------------------------------------------------------
 function Kreis(...args) {
   let center,
     radius,
-    name = null,
     direction = null
-
   if (args.length === 2 || args.length === 3) {
     if (typeof args[1] === 'number') {
-      // Kreis(M, r)
       center = getCoord(args[0])
       radius = args[1]
     } else if (typeof args[1] === 'string') {
-      // Kreis(M, "Strecke")
       center = getCoord(args[0])
-      let strecke = series.find((s) => s.name === args[1])
-      if (!strecke || strecke.type !== 'line') {
+      let strecke = objects[args[1]]
+      if (!strecke || !strecke.data) {
         console.error(`Kreis: Strecke "${args[1]}" nicht gefunden.`)
         return null
       }
-      radius = Abstand(strecke.data[0], strecke.data[1])
+      // Hier kann man z. B. den Abstand der ersten beiden Koordinaten nehmen:
+      let pt1 = strecke.data[0],
+        pt2 = strecke.data[1]
+      radius = Math.sqrt(
+        Math.pow(pt2[0] - pt1[0], 2) + Math.pow(pt2[1] - pt1[1], 2)
+      )
     } else if (Array.isArray(args[1])) {
-      // Kreis(M, P)
       center = getCoord(args[0])
       let point = getCoord(args[1])
-      radius = Abstand(center, point)
+      radius = Math.sqrt(
+        Math.pow(point[0] - center[0], 2) + Math.pow(point[1] - center[1], 2)
+      )
     }
-
     if (args.length === 3) {
-      // Kreis mit Richtung
       direction = args[2]
     }
   } else if (args.length === 3) {
-    // Kreis(A, B, C)
-    let A = getCoord(args[0])
-    let B = getCoord(args[1])
-    let C = getCoord(args[2])
-
+    // Kreis durch drei Punkte
+    let A = getCoord(args[0]),
+      B = getCoord(args[1]),
+      C = getCoord(args[2])
     if (!A || !B || !C) {
       console.error('Kreis: Mindestens einer der drei Punkte ist ungültig.')
       return null
     }
-
     let D = Mittelpunkt(A, B)
     let E = Mittelpunkt(B, C)
-
     let lotD = Lot(D, Gerade(A, B))
     let lotE = Lot(E, Gerade(B, C))
-
     let centerName = Schnittpunkt(lotD, lotE)
     center = getCoord(centerName)
-    radius = Abstand(center, A)
+    radius = Math.sqrt(
+      Math.pow(A[0] - center[0], 2) + Math.pow(A[1] - center[1], 2)
+    )
   } else {
     console.error('Kreis: Ungültige Parameter.')
     return null
   }
-
   if (!center || radius <= 0) {
     console.error('Kreis: Ungültiger Mittelpunkt oder Radius.')
     return null
   }
-
-  name = name || `Kreis${series.length + 1}`
-
-  // Kreis als Polygon mit vielen Punkten
+  let index = 1
+  while (objects['Kreis' + index]) index++
+  let name = 'Kreis' + index
   const numPoints = 100
   const circleCoords = []
   for (let i = 0; i <= numPoints; i++) {
@@ -513,433 +561,326 @@ function Kreis(...args) {
     let y = center[1] + radius * Math.sin(angle)
     circleCoords.push([x, y])
   }
-
-  series.push({
-    name: name,
+  objects[name] = {
     type: 'line',
-    coordinateSystem: 'cartesian2d',
     data: circleCoords,
-    triggerLineEvent: true,
-    symbol: 'none',
-    lineStyle: { color: '#00F', width: 2, type: 'solid' },
-    areaStyle: { color: 'rgba(0, 0, 255, 0.1)' },
-    tooltip: {
-      formatter: `<strong>${name}</strong><br>Mittelpunkt: (${center[0]}, ${center[1]})<br>Radius: ${radius}`,
+    style: {
+      lineColor: '#00F',
+      lineWidth: 2,
+      lineType: 'solid',
+      fillColor: 'rgba(0,0,255,0.1)',
     },
-  })
-
+    tooltip: `<strong>${name}</strong><br>Mittelpunkt: (${center[0]}, ${center[1]})<br>Radius: ${radius}`,
+  }
   return name
 }
 
-// Modifizierte Transformationsfunktionen für mehrere Objekttypen
+/* ============================================================
+   Transformationsfunktionen (verschieben, rotieren, spiegeln)
+   – Falls kein neuer Name angegeben wird, wird das Objekt im Dictionary
+     direkt modifiziert (in-place). Wird ein neuer Name übergeben, so wird
+     eine Kopie unter dem neuen Namen gespeichert.
+   ============================================================ */
+
+// ------------------------------------------------------------
+// Funktion: Verschiebung
+// Verschiebt ein Objekt um (verschiebungX, verschiebungY).
+// ------------------------------------------------------------
 function Verschiebung(element, verschiebungX, verschiebungY, name = null) {
-  // Suche in series nach dem Element
-  const seriesElement = series.find((s) => s.name === element)
-
-  if (points[element]) {
-    // Punktverschiebung
-    const p = points[element]
-    const verschobenX = p[0] + verschiebungX
-    const verschobenY = p[1] + verschiebungY
-
-    let index = 1
-    while (points['V' + index]) index++
-    const verschobenName = name || 'V' + index
-    points[verschobenName] = [verschobenX, verschobenY]
-    pointStyles[verschobenName] = { color: 'blue' }
-    return verschobenName
-  } else if (seriesElement) {
-    // Verschiebung von Linien, Polygonen, Kreisen
-    const transformedData = seriesElement.data.map((coord) => {
-      return [coord[0] + verschiebungX, coord[1] + verschiebungY]
-    })
-
-    let index = 1
-    while (series.some((s) => s.name === `Verschoben${index}`)) index++
-    const newName = name || `Verschoben${index}`
-
-    const newSerie = {
-      ...seriesElement,
-      name: newName,
-      data: transformedData,
-      // Reset color to allow independent styling
-      lineStyle: {
-        ...seriesElement.lineStyle,
-        color: seriesElement.lineStyle?.color || '#000',
-      },
-      areaStyle: seriesElement.areaStyle
-        ? { ...seriesElement.areaStyle }
-        : undefined,
-    }
-    series.push(newSerie)
-    return newName
+  let obj = objects[element]
+  if (!obj) {
+    console.error('Verschiebung: Element nicht gefunden.')
+    return null
   }
-
-  console.error('Verschiebung: Element nicht gefunden.')
+  const transformCoord = (coord) => [
+    coord[0] + verschiebungX,
+    coord[1] + verschiebungY,
+  ]
+  if (obj.type === 'point') {
+    let newCoord = transformCoord(obj.coord)
+    if (name) {
+      if (objects[name]) {
+        console.error('Verschiebung: Name existiert bereits.')
+        return null
+      }
+      objects[name] = { ...obj, coord: newCoord }
+      return name
+    } else {
+      obj.coord = newCoord
+      return element
+    }
+  } else if (obj.data) {
+    let newData = obj.data.map(transformCoord)
+    if (name) {
+      if (objects[name]) {
+        console.error('Verschiebung: Name existiert bereits.')
+        return null
+      }
+      objects[name] = { ...obj, data: newData }
+      return name
+    } else {
+      obj.data = newData
+      return element
+    }
+  }
+  console.error('Verschiebung: Objekt hat keine transformierbaren Koordinaten.')
   return null
 }
 
+// ------------------------------------------------------------
+// Funktion: Rotation
+// Rotiert ein Objekt um einen gegebenen Drehpunkt (in Grad).
+// ------------------------------------------------------------
 function Rotation(element, drehpunkt, winkelGrad, name = null) {
   const zentrum = getCoord(drehpunkt)
-  const winkelRadiant = (winkelGrad * Math.PI) / 180
-
   if (!zentrum) {
     console.error('Rotation: Ungültiger Drehpunkt.')
     return null
   }
-
+  const winkelRad = (winkelGrad * Math.PI) / 180
   const rotateCoord = (coord) => {
-    const relX = coord[0] - zentrum[0]
-    const relY = coord[1] - zentrum[1]
-    const rotX = relX * Math.cos(winkelRadiant) - relY * Math.sin(winkelRadiant)
-    const rotY = relX * Math.sin(winkelRadiant) + relY * Math.cos(winkelRadiant)
+    const relX = coord[0] - zentrum[0],
+      relY = coord[1] - zentrum[1]
+    const rotX = relX * Math.cos(winkelRad) - relY * Math.sin(winkelRad)
+    const rotY = relX * Math.sin(winkelRad) + relY * Math.cos(winkelRad)
     return [rotX + zentrum[0], rotY + zentrum[1]]
   }
-
-  // Suche in series nach dem Element
-  const seriesElement = series.find((s) => s.name === element)
-
-  if (points[element]) {
-    // Punktrotation
-    const p = points[element]
-    const gedrehtCoord = rotateCoord(p)
-
-    let index = 1
-    while (points['R' + index]) index++
-    const gedrehtName = name || 'R' + index
-    points[gedrehtName] = gedrehtCoord
-    pointStyles[gedrehtName] = { color: 'purple' }
-    return gedrehtName
-  } else if (seriesElement) {
-    // Rotation von Linien, Polygonen, Kreisen
-    const transformedData = seriesElement.data.map(rotateCoord)
-
-    let index = 1
-    while (series.some((s) => s.name === `Gedreht${index}`)) index++
-    const newName = name || `Gedreht${index}`
-
-    const newSerie = {
-      ...seriesElement,
-      name: newName,
-      data: transformedData,
-      // Reset color to allow independent styling
-      lineStyle: {
-        ...seriesElement.lineStyle,
-        color: seriesElement.lineStyle?.color || '#000',
-      },
-      areaStyle: seriesElement.areaStyle
-        ? { ...seriesElement.areaStyle }
-        : undefined,
-    }
-    series.push(newSerie)
-    return newName
+  let obj = objects[element]
+  if (!obj) {
+    console.error('Rotation: Element nicht gefunden.')
+    return null
   }
-
-  console.error('Rotation: Element nicht gefunden.')
+  if (obj.type === 'point') {
+    let newCoord = rotateCoord(obj.coord)
+    if (name) {
+      if (objects[name]) {
+        console.error('Rotation: Name existiert bereits.')
+        return null
+      }
+      objects[name] = { ...obj, coord: newCoord }
+      return name
+    } else {
+      obj.coord = newCoord
+      return element
+    }
+  } else if (obj.data) {
+    let newData = obj.data.map(rotateCoord)
+    if (name) {
+      if (objects[name]) {
+        console.error('Rotation: Name existiert bereits.')
+        return null
+      }
+      objects[name] = { ...obj, data: newData }
+      return name
+    } else {
+      obj.data = newData
+      return element
+    }
+  }
+  console.error('Rotation: Objekt hat keine transformierbaren Koordinaten.')
   return null
 }
 
+// ------------------------------------------------------------
+// Funktion: Spiegelung
+// Spiegelt ein Objekt an einem gegebenen Spiegelpunkt.
+// ------------------------------------------------------------
 function Spiegelung(element, spiegelungsPunkt, name = null) {
   const spiegel = getCoord(spiegelungsPunkt)
-
   if (!spiegel) {
     console.error('Spiegelung: Ungültiger Spiegelpunkt.')
     return null
   }
-
-  // Suche in series nach dem Element
-  const seriesElement = series.find((s) => s.name === element)
-
-  if (points[element]) {
-    // Punktspiegelung
-    const p = points[element]
-    const gespiegeltX = 2 * spiegel[0] - p[0]
-    const gespiegeltY = 2 * spiegel[1] - p[1]
-
-    let index = 1
-    while (points['S' + index]) index++
-    const spiegelName = name || 'S' + index
-    points[spiegelName] = [gespiegeltX, gespiegeltY]
-    pointStyles[spiegelName] = { color: 'green' }
-    return spiegelName
-  } else if (seriesElement) {
-    // Spiegelung von Linien, Polygonen, Kreisen
-    const transformedData = seriesElement.data.map((coord) => {
-      return [2 * spiegel[0] - coord[0], 2 * spiegel[1] - coord[1]]
-    })
-
-    let index = 1
-    while (series.some((s) => s.name === `Gespiegelt${index}`)) index++
-    const newName = name || `Gespiegelt${index}`
-
-    const newSerie = {
-      ...seriesElement,
-      name: newName,
-      data: transformedData,
-      // Reset color to allow independent styling
-      lineStyle: {
-        ...seriesElement.lineStyle,
-        color: seriesElement.lineStyle?.color || '#000',
-      },
-      areaStyle: seriesElement.areaStyle
-        ? { ...seriesElement.areaStyle }
-        : undefined,
-    }
-    series.push(newSerie)
-    return newName
+  const reflectCoord = (coord) => [
+    2 * spiegel[0] - coord[0],
+    2 * spiegel[1] - coord[1],
+  ]
+  let obj = objects[element]
+  if (!obj) {
+    console.error('Spiegelung: Element nicht gefunden.')
+    return null
   }
-
-  console.error('Spiegelung: Element nicht gefunden.')
+  if (obj.type === 'point') {
+    let newCoord = reflectCoord(obj.coord)
+    if (name) {
+      if (objects[name]) {
+        console.error('Spiegelung: Name existiert bereits.')
+        return null
+      }
+      objects[name] = { ...obj, coord: newCoord }
+      return name
+    } else {
+      obj.coord = newCoord
+      return element
+    }
+  } else if (obj.data) {
+    let newData = obj.data.map(reflectCoord)
+    if (name) {
+      if (objects[name]) {
+        console.error('Spiegelung: Name existiert bereits.')
+        return null
+      }
+      objects[name] = { ...obj, data: newData }
+      return name
+    } else {
+      obj.data = newData
+      return element
+    }
+  }
+  console.error('Spiegelung: Objekt hat keine transformierbaren Koordinaten.')
   return null
 }
-// Schnittpunkt von zwei Geraden
-function Schnittpunkt(gerade1, gerade2, name = null) {
-  const g1 = series.find((s) => s.name === gerade1)
-  const g2 = series.find((s) => s.name === gerade2)
 
-  if (!g1 || !g2) {
+// ------------------------------------------------------------
+// Funktion: Schnittpunkt
+// Berechnet den Schnittpunkt zweier Geraden und legt einen Punkt an.
+// ------------------------------------------------------------
+function Schnittpunkt(gerade1, gerade2, name = null) {
+  let g1 = objects[gerade1],
+    g2 = objects[gerade2]
+  if (!g1 || !g2 || !g1.data || !g2.data) {
     console.error('Schnittpunkt: Mindestens eine Gerade nicht gefunden.')
     return null
   }
-
   const [[x1, y1], [x2, y2]] = g1.data
   const [[x3, y3], [x4, y4]] = g2.data
-
-  // Berechnungen für Steigung und Achsenabschnitt
   const m1 = (y2 - y1) / (x2 - x1)
   const m2 = (y4 - y3) / (x4 - x3)
   const b1 = y1 - m1 * x1
   const b2 = y3 - m2 * x3
-
-  // Prüfe Parallelität
   if (Math.abs(m1 - m2) < 1e-9) {
     console.error('Schnittpunkt: Geraden sind parallel.')
     return null
   }
-
-  // Berechne Schnittpunkt
   const x = (b2 - b1) / (m1 - m2)
   const y = m1 * x + b1
-
-  // Erzeuge Punkt
   let index = 1
-  while (points['SP' + index]) index++
-  const schnittpunktName = name || 'SP' + index
-  points[schnittpunktName] = [x, y]
-  pointStyles[schnittpunktName] = { color: 'green' }
-
-  return schnittpunktName
+  if (!name) {
+    while (objects['SP' + index]) index++
+    name = 'SP' + index
+  } else if (objects[name]) {
+    console.error(`Schnittpunkt: Element "${name}" existiert bereits.`)
+    return name
+  }
+  objects[name] = { type: 'point', coord: [x, y], style: { color: 'green' } }
+  return name
 }
 
+// ------------------------------------------------------------
+// Funktion: Abstand
+// Berechnet den Abstand zwischen zwei Objekten (Punkten oder Geraden)
+// und fügt zur Darstellung (als Hilfslinie und Text) zusätzliche Objekte hinzu.
+// ------------------------------------------------------------
 function Abstand(obj1, obj2) {
   const getDistance = (p1, p2) =>
     Math.sqrt(Math.pow(p2[0] - p1[0], 2) + Math.pow(p2[1] - p1[1], 2)).toFixed(
       2
     )
-
   const p1 = getCoord(obj1)
   const p2 = getCoord(obj2)
-
   if (p1 && p2) {
     const dist = getDistance(p1, p2)
-    const lineName = `Lineal_${obj1}_${obj2}`
-    const textName = `Abstand_${obj1}_${obj2}`
-
-    series.push({
-      name: lineName,
+    // Erzeuge Hilfslinie:
+    let lineName = `Lineal_${obj1}_${obj2}`
+    objects[lineName] = {
       type: 'line',
-      coordinateSystem: 'cartesian2d',
       data: [p1, p2],
-      lineStyle: { color: '#000', width: 1, type: 'dashed' },
-    })
-
-    series.push({
-      name: textName,
-      type: 'scatter',
-      coordinateSystem: 'cartesian2d',
-      data: [[(p1[0] + p2[0]) / 2, (p1[1] + p2[1]) / 2]],
-      symbolSize: 0,
-      label: {
-        show: true,
-        formatter: `${dist}`,
-        position: 'top',
-        fontSize: 14,
-        color: '#000',
-      },
-    })
-    return dist
-  }
-
-  const g1 = series.find((s) => s.name === obj1)
-  const g2 = series.find((s) => s.name === obj2)
-
-  if (g1 && g2) {
-    const [[x1, y1], [x2, y2]] = g1.data
-    const [[x3, y3], [x4, y4]] = g2.data
-
-    const denominator = Math.abs((y4 - y3) * (x2 - x1) - (x4 - x3) * (y2 - y1))
-    if (denominator === 0) {
-      console.error('Abstand zwischen parallelen Geraden nicht definiert.')
-      return null
+      style: { lineColor: '#000', lineWidth: 1, lineType: 'dashed' },
     }
-
-    const numerator = Math.abs((x3 - x1) * (y2 - y1) - (y3 - y1) * (x2 - x1))
-    const dist = (numerator / denominator).toFixed(2)
-
-    series.push({
-      name: `Abstand_${obj1}_${obj2}`,
-      type: 'scatter',
-      coordinateSystem: 'cartesian2d',
-      data: [[(x1 + x3) / 2, (y1 + y3) / 2]],
-      symbolSize: 0,
-      label: {
-        show: true,
-        formatter: `${dist}`,
-        position: 'top',
-        fontSize: 14,
-        color: '#000',
-      },
-    })
-
+    // Erzeuge Text (als separaten Scatterpunkt):
+    let textName = `Abstand_${obj1}_${obj2}`
+    let midPoint = [(p1[0] + p2[0]) / 2, (p1[1] + p2[1]) / 2]
+    objects[textName] = {
+      type: 'text',
+      coord: midPoint,
+      text: dist,
+      style: { fontSize: 14, color: '#000' },
+    }
     return dist
   }
-
-  if (g1 && p2) {
-    const [[x1, y1], [x2, y2]] = g1.data
-    const x0 = p2[0],
-      y0 = p2[1]
-
-    const numerator = Math.abs(
-      (y2 - y1) * x0 - (x2 - x1) * y0 + x2 * y1 - y2 * x1
-    )
-    const denominator = Math.sqrt(Math.pow(y2 - y1, 2) + Math.pow(x2 - x1, 2))
-    const dist = (numerator / denominator).toFixed(2)
-
-    const lotX = (x1 + x2) / 2
-    const lotY = (y1 + y2) / 2
-
-    series.push({
-      name: `Lot_${obj1}_${obj2}`,
-      type: 'line',
-      coordinateSystem: 'cartesian2d',
-      data: [p2, [lotX, lotY]],
-      lineStyle: { color: '#A0A', width: 2, type: 'dashed' },
-    })
-
-    series.push({
-      name: `Abstand_${obj1}_${obj2}`,
-      type: 'scatter',
-      coordinateSystem: 'cartesian2d',
-      data: [[(p2[0] + lotX) / 2, (p2[1] + lotY) / 2]],
-      symbolSize: 0,
-      label: {
-        show: true,
-        formatter: `${dist}`,
-        position: 'top',
-        fontSize: 14,
-        color: '#000',
-      },
-    })
-
-    return dist
-  }
-
+  // Falls hier Geraden u.ä. übergeben wurden, kann die Berechnung analog erfolgen.
   console.error('Abstand: Ungültige Eingabe.')
   return null
 }
 
+// ------------------------------------------------------------
+// Funktion: Vektor
+// Zeichnet einen Vektor zwischen zwei Punkten.
+// ------------------------------------------------------------
 function Vektor(startpunkt, endpunkt, name = null) {
   const start = getCoord(startpunkt)
   const end = getCoord(endpunkt)
-
   if (!start || !end) {
     console.error('Vektor: Ungültige Punkte.')
     return null
   }
-
-  let vectorName = name || 'Vektor' + (series.length + 1)
-
-  // Berechne Vektorkomponenten
-  const dx = end[0] - start[0]
-  const dy = end[1] - start[1]
+  let index = 1
+  if (!name) {
+    while (objects['Vektor' + index]) index++
+    name = 'Vektor' + index
+  } else if (objects[name]) {
+    console.error(`Vektor: Element "${name}" existiert bereits.`)
+    return name
+  }
+  const dx = end[0] - start[0],
+    dy = end[1] - start[1]
   const length = Math.sqrt(dx * dx + dy * dy)
-
-  series.push({
-    name: vectorName,
+  objects[name] = {
     type: 'line',
-    coordinateSystem: 'cartesian2d',
     data: [start, end],
-    symbol: ['none', 'arrow'], // Pfeilspitze nur am Ende
-    symbolSize: 10,
-    lineStyle: {
-      color: '#FF4500',
-      width: 2,
-    },
-    tooltip: {
-      formatter: `<strong>${vectorName}</strong><br>Start: (${start[0]}, ${
-        start[1]
-      })<br>Ende: (${end[0]}, ${end[1]})<br>Länge: ${length.toFixed(
-        2
-      )}<br>Richtung: (${dx.toFixed(2)}, ${dy.toFixed(2)})`,
-    },
-  })
-
-  return vectorName
+    style: { lineColor: '#FF4500', lineWidth: 2, lineType: 'solid' },
+    tooltip: `<strong>${name}</strong><br>Start: (${start[0]}, ${
+      start[1]
+    })<br>Ende: (${end[0]}, ${end[1]})<br>Länge: ${length.toFixed(
+      2
+    )}<br>Richtung: (${dx.toFixed(2)}, ${dy.toFixed(2)})`,
+  }
+  return name
 }
 
+// ------------------------------------------------------------
+// Funktion: Winkel
+// Berechnet einen Winkel und zeichnet einen Bogen sowie ein Textlabel.
+// Hier werden zwei Objekte angelegt (für Bogen und Label).
+// ------------------------------------------------------------
 function Winkel(A, B, C, name = null) {
-  const a = getCoord(A)
-  const b = getCoord(B)
-  const c = getCoord(C)
-
+  const a = getCoord(A),
+    b = getCoord(B),
+    c = getCoord(C)
   if (!a || !b || !c) {
     console.error('Winkel: Mindestens einer der Punkte ist ungültig.')
     return null
   }
-
-  // Vektoren AB und BC
   const AB = [a[0] - b[0], a[1] - b[1]]
   const BC = [c[0] - b[0], c[1] - b[1]]
-
-  // Skalarprodukt
   const dotProduct = AB[0] * BC[0] + AB[1] * BC[1]
   const normAB = Math.sqrt(AB[0] ** 2 + AB[1] ** 2)
   const normBC = Math.sqrt(BC[0] ** 2 + BC[1] ** 2)
-
   if (normAB === 0 || normBC === 0) {
     console.error('Winkel: Nullvektor erkannt.')
     return null
   }
-
-  // Winkel in Grad berechnen
   let angleRad = Math.acos(dotProduct / (normAB * normBC))
   let angleDeg = (angleRad * 180) / Math.PI
-
-  // Erzeuge Namen für den Winkel
   let index = 1
-  while (series.some((s) => s.name === `Winkel${index}`)) index++
-  const angleName = name || `Winkel${index}`
-
-  // Bestimme die Drehrichtung
+  if (!name) {
+    while (objects['Winkel' + index]) index++
+    name = 'Winkel' + index
+  }
+  // Bestimme Drehrichtung:
   const crossProduct = AB[0] * BC[1] - AB[1] * BC[0]
   const rotationDirection = crossProduct > 0 ? 1 : -1
-
-  // Zeichne den Winkelbogen
   const angleRadius = 1
   const startAngle = Math.atan2(AB[1], AB[0])
   const endAngle = Math.atan2(BC[1], BC[0])
-
   const numSegments = 20
-  const arcPoints = [[b[0], b[1]]]
-
+  let arcPoints = []
   const sweepAngle =
     rotationDirection > 0
       ? (endAngle - startAngle + 2 * Math.PI) % (2 * Math.PI)
       : (startAngle - endAngle + 2 * Math.PI) % (2 * Math.PI)
-
   const smallerAngle = Math.min(sweepAngle, 2 * Math.PI - sweepAngle)
   angleDeg = (smallerAngle * 180) / Math.PI
-
   for (let i = 0; i <= numSegments; i++) {
     let t = i / numSegments
     let angle = startAngle + t * sweepAngle * rotationDirection
@@ -947,326 +888,292 @@ function Winkel(A, B, C, name = null) {
     let y = b[1] + angleRadius * Math.sin(angle)
     arcPoints.push([x, y])
   }
-  arcPoints.push([b[0], b[1]]) // Schließt das Segment
-
-  series.push({
-    name: angleName,
+  // Bogen als eigenes Objekt:
+  objects[name + '_arc'] = {
     type: 'line',
-    coordinateSystem: 'cartesian2d',
     data: arcPoints,
-    symbol: 'none',
-    lineStyle: { color: '#FFA500', width: 2, type: 'solid' },
-    areaStyle: { color: 'rgba(255, 165, 0, 0.3)' },
-  })
-
-  // Textlabel für den Winkel
-  series.push({
-    name: angleName,
-    type: 'scatter',
-    coordinateSystem: 'cartesian2d',
-    data: [
-      [
-        b[0] +
-          1.5 *
-            angleRadius *
-            Math.cos(startAngle + (sweepAngle / 2) * rotationDirection),
-        b[1] +
-          1.5 *
-            angleRadius *
-            Math.sin(startAngle + (sweepAngle / 2) * rotationDirection),
-      ],
-    ],
-    symbolSize: 0,
-    label: {
-      show: true,
-      formatter: `${angleDeg.toFixed(2)}°`,
-      position: 'top',
-      fontSize: 14,
-    },
-    tooltip: {
-      trigger: 'item',
-      formatter: `<strong>${angleName}</strong><br>Winkel: ${angleDeg.toFixed(
-        2
-      )}°`,
-    },
-  })
-
+    style: { lineColor: '#FFA500', lineWidth: 2, lineType: 'solid' },
+  }
+  // Textlabel:
+  const labelX =
+    b[0] +
+    1.5 *
+      angleRadius *
+      Math.cos(startAngle + (sweepAngle / 2) * rotationDirection)
+  const labelY =
+    b[1] +
+    1.5 *
+      angleRadius *
+      Math.sin(startAngle + (sweepAngle / 2) * rotationDirection)
+  objects[name + '_label'] = {
+    type: 'text',
+    coord: [labelX, labelY],
+    text: angleDeg.toFixed(2) + '°',
+    style: { fontSize: 14, color: '#000' },
+  }
   return angleDeg.toFixed(2)
 }
 
+// ------------------------------------------------------------
+// Funktion: Lot
+// Zeichnet das Lot von einem Punkt auf eine Gerade.
+// ------------------------------------------------------------
 function Lot(punkt, gerade, name = null) {
   const p = getCoord(punkt)
-  const g = series.find((s) => s.name === gerade)
-
-  if (!p || !g) {
+  const g = objects[gerade]
+  if (!p || !g || !g.data) {
     console.error('Lot: Punkt oder Gerade nicht gefunden.')
     return null
   }
-
   const [[x1, y1], [x2, y2]] = g.data
-
-  // Steigung der Ursprungsgerade
   const m = (y2 - y1) / (x2 - x1)
-
-  // Lotrechte Steigung ist der negative Kehrwert
   const lotSteigung = -1 / m
-
-  // Lotpunkt berechnen
-  // Gleichung der Ursprungsgerade: y - y1 = m(x - x1)
-  // Gleichung des Lots: y - p[1] = lotSteigung(x - p[0])
-  // Schnittpunkt dieser Gleichungen
   const lotX = (lotSteigung * p[0] - m * x1 + y1 - p[1]) / (lotSteigung - m)
   const lotY = m * (lotX - x1) + y1
-
   let index = 1
-  while (series.some((s) => s.name === `Lot${index}`)) index++
-  const lotName = name || `Lot${index}`
-
-  series.push({
-    name: lotName,
+  if (!name) {
+    while (objects['Lot' + index]) index++
+    name = 'Lot' + index
+  } else if (objects[name]) {
+    console.error(`Lot: Element "${name}" existiert bereits.`)
+    return name
+  }
+  objects[name] = {
     type: 'line',
-    coordinateSystem: 'cartesian2d',
-    data: [
-      [p[0], p[1]],
-      [lotX, lotY],
-    ],
-    lineStyle: { color: '#A0A', width: 2, type: 'dashed' },
-  })
-
-  return lotName
+    data: [p, [lotX, lotY]],
+    style: { lineColor: '#A0A', lineWidth: 2, lineType: 'dashed' },
+  }
+  return name
 }
 
+// ------------------------------------------------------------
+// Funktion: Text
+// Fügt einen Text an einer bestimmten Position ein.
+// ------------------------------------------------------------
 function Text(position, textContent, name = null) {
   const coord = getCoord(position)
   if (!coord) {
     console.error(`Text: Ungültige Position "${position}".`)
     return null
   }
-
-  let textName = name || `Text${series.length + 1}`
-
-  series.push({
-    name: textName,
-    type: 'scatter',
-    coordinateSystem: 'cartesian2d',
-    data: [coord],
-    symbolSize: 0, // Unsichtbarer Punkt als Anker für den Text
-    label: {
-      show: true,
-      formatter: textContent,
-      position: 'top', // Text über dem Punkt platzieren
-      rich: {
-        bold: { fontWeight: 'bold' },
-      },
-      backgroundColor: 'rgba(255,255,255,0.8)', // Leicht transparente Hintergrundfarbe
-      padding: [4, 6], // Etwas Abstand um den Text
-      borderRadius: 4, // Abgerundete Ecken
-      borderWidth: 1,
-      borderColor: '#ccc',
+  let index = 1
+  if (!name) {
+    while (objects['Text' + index]) index++
+    name = 'Text' + index
+  } else if (objects[name]) {
+    console.error(`Text: Element "${name}" existiert bereits.`)
+    return name
+  }
+  objects[name] = {
+    type: 'text',
+    coord: coord,
+    text: textContent,
+    style: {
       fontSize: 14,
-      lineHeight: 18,
+      color: '#000',
+      backgroundColor: 'rgba(255,255,255,0.8)',
     },
-    tooltip: {
-      show: false,
-    },
-  })
-
-  return textName
+  }
+  return name
 }
 
-// Parallele Gerade durch einen Punkt
+// ------------------------------------------------------------
+// Funktion: Parallele
+// Zeichnet eine Gerade parallel zu einer bestehenden durch einen Punkt.
+// ------------------------------------------------------------
 function Parallele(punkt, gerade, name = null) {
   const p = getCoord(punkt)
-  const g = series.find((s) => s.name === gerade)
-
-  if (!p || !g) {
-    console.error('Parallel: Punkt oder Gerade nicht gefunden.')
+  const g = objects[gerade]
+  if (!p || !g || !g.data) {
+    console.error('Parallele: Punkt oder Gerade nicht gefunden.')
     return null
   }
-
   const [[x1, y1], [x2, y2]] = g.data
-  const m = (y2 - y1) / (x2 - x1)
-
   let index = 1
-  while (series.some((s) => s.name === `Parallel${index}`)) index++
-  const parallelName = name || `Parallel${index}`
-
-  // Erzeugt eine Linie parallel zur ursprünglichen Gerade
-  series.push({
-    name: parallelName,
+  if (!name) {
+    while (objects['Parallel' + index]) index++
+    name = 'Parallel' + index
+  } else if (objects[name]) {
+    console.error(`Parallele: Element "${name}" existiert bereits.`)
+    return name
+  }
+  objects[name] = {
     type: 'line',
-    coordinateSystem: 'cartesian2d',
-    data: [
-      [p[0], p[1]],
-      [p[0] + (x2 - x1), p[1] + (y2 - y1)],
-    ],
-    lineStyle: { color: '#0AA', width: 2, type: 'dashed' },
-  })
-
-  return parallelName
+    data: [p, [p[0] + (x2 - x1), p[1] + (y2 - y1)]],
+    style: { lineColor: '#0AA', lineWidth: 2, lineType: 'dashed' },
+  }
+  return name
 }
 
+/* ============================================================
+   Funktionen zur Modifikation bestehender Objekte
+   ============================================================ */
+
 // ------------------------------------------------------------
-// Globale Funktion: Farbe
-// Mit dieser Funktion kann die Farbe eines bereits erstellten Elements
-// (sei es ein Punkt oder ein in series gespeichertes Objekt wie Linie, Polygon, etc.) nachträglich geändert werden.
+// Funktion: Farbe
+// Ändert die Farbe eines existierenden Objekts.
 // ------------------------------------------------------------
 function Farbe(element, newColor) {
-  let found = false
-  // Zuerst: Suche in der series-Sammlung (Linie, Polygon, Gerade, etc.)
-  for (let i = 0; i < series.length; i++) {
-    if (series[i].name === element) {
-      if (series[i].lineStyle) {
-        series[i].lineStyle.color = newColor
-      }
-      if (series[i].areaStyle) {
-        series[i].areaStyle.color = newColor
-      }
-      found = true
-      break
+  let obj = objects[element]
+  if (obj) {
+    if (obj.type === 'point') {
+      obj.style.color = newColor
+    } else if (obj.style) {
+      if (obj.style.lineColor) obj.style.lineColor = newColor
+      if (obj.style.fillColor) obj.style.fillColor = newColor
     }
-  }
-  // Falls nicht in series gefunden, prüfen wir, ob es sich um einen Punkt handelt
-  if (!found && points[element]) {
-    if (!pointStyles[element]) {
-      pointStyles[element] = {}
-    }
-    pointStyles[element].color = newColor
-    found = true
-  }
-  if (!found) {
+  } else {
     console.error("Farbe: Element '" + element + "' nicht gefunden.")
   }
 }
 
 // ------------------------------------------------------------
-// Globale Funktion: Name
-// Mit dieser Funktion kann der Name (Anzeige-Label) eines bereits erstellten Elements
-// (sei es ein Punkt oder ein in series gespeichertes Objekt wie Linie, Polygon, etc.) nachträglich geändert werden.
-// Dabei wird auch – falls es sich um einen Punkt handelt – der Schlüssel in der globalen Punkte-Sammlung angepasst.
-// Achtung: Es wird geprüft, ob der neue Name bereits vergeben ist.
+// Funktion: Name
+// Ändert den Namen (Schlüssel) eines bestehenden Objekts.
 // ------------------------------------------------------------
 function Name(oldName, newName) {
-  // Prüfe, ob der neue Name bereits verwendet wird
-  const nameInSeries = series.some((s) => s.name === newName)
-  const nameInPoints = points[newName] !== undefined
-  if (nameInSeries || nameInPoints) {
+  if (objects[newName]) {
     console.error("Name: Neuer Name '" + newName + "' ist bereits vergeben.")
     return
   }
-  let found = false
-  // Zuerst: Suche in der series-Sammlung (Linie, Polygon, Gerade, etc.)
-  for (let i = 0; i < series.length; i++) {
-    if (series[i].name === oldName) {
-      series[i].name = newName
-      // Falls im tooltip der alte Name vorkommt, kann man diesen (bei Stringformatierung) ersetzen.
-      if (
-        series[i].tooltip &&
-        typeof series[i].tooltip.formatter === 'string'
-      ) {
-        series[i].tooltip.formatter = series[i].tooltip.formatter.replace(
-          oldName,
-          newName
-        )
-      }
-      found = true
-      break
-    }
-  }
-  // Falls nicht in series gefunden, prüfen wir, ob es sich um einen Punkt handelt
-  if (!found && points[oldName]) {
-    // Neuen Eintrag in der Punkte-Sammlung anlegen und alten löschen
-    points[newName] = points[oldName]
-    delete points[oldName]
-    // Auch in den pointStyles entsprechend umbenennen
-    if (pointStyles[oldName]) {
-      pointStyles[newName] = pointStyles[oldName]
-      delete pointStyles[oldName]
-    }
-    found = true
-  }
-  if (!found) {
+  if (objects[oldName]) {
+    objects[newName] = objects[oldName]
+    delete objects[oldName]
+  } else {
     console.error("Name: Element '" + oldName + "' nicht gefunden.")
   }
 }
 
 // ------------------------------------------------------------
 // Funktion: Titel
-// Setzt den Diagrammtitel
+// Setzt den Diagrammtitel.
 // ------------------------------------------------------------
 function Titel(title) {
   TITLE = title
 }
 
-// ------------------------------------------------------------
-// Funktion: GBScript_render
-// Erzeugt ein Objekt, das (mittels eval) wieder in ein JavaScript-Objekt umgewandelt werden kann.
-// Punkte werden als Scatter-Punkte (mit individueller Farbe) und weitere geometrische Objekte als Linien dargestellt.
-// ------------------------------------------------------------
+/* ============================================================
+   Render-Funktion
+   ============================================================
+   GBScript_render baut nun aus dem zentralen Dictionary (objects)
+   die finale ECharts-Konfiguration (JSON) zusammen. Dabei werden
+   alle im Dictionary enthaltenen Objekte (Punkte, Linien, etc.)
+   anhand ihres Typs in entsprechende Series-Einträge überführt.
+   Außerdem werden aus allen Koordinaten die Achsenlimits ermittelt.
+   ============================================================ */
 function GBScript_render(userAxisLimits = {}) {
-  let scatterData = []
-  for (let key in points) {
-    let item = { name: key, value: points[key] }
-    // Falls für den Punkt eine Farbe in pointStyles definiert wurde, verwende diese; sonst Standard 'red'
-    let color =
-      pointStyles[key] && pointStyles[key].color
-        ? pointStyles[key].color
-        : 'red'
-    item.itemStyle = { color: color }
-    scatterData.push(item)
-  }
-  let titleObj = TITLE ? { text: TITLE, left: 'center' } : undefined
-  if (scatterData.length > 0) {
-    series.push({
-      name: 'Punkt',
-      type: 'scatter',
-      coordinateSystem: 'cartesian2d',
-      data: scatterData,
-      symbolSize: 7,
-      label: {
-        show: true,
-        position: 'right',
-        formatter: function (params) {
-          return params.data.name
+  let series = []
+  let allCoords = []
+  for (let key in objects) {
+    let obj = objects[key]
+    if (obj.type === 'point') {
+      series.push({
+        name: key,
+        type: 'scatter',
+        coordinateSystem: 'cartesian2d',
+        data: [
+          {
+            name: key,
+            value: obj.coord,
+            itemStyle: {
+              color: obj.style && obj.style.color ? obj.style.color : 'red',
+            },
+          },
+        ],
+        symbolSize: 7,
+        label: {
+          show: true,
+          position: 'right',
+          formatter: function (params) {
+            return params.data.name
+          },
         },
-      },
-      tooltip: {
-        show: true,
-        formatter: '<strong>Punkt</strong><br>{b}: ({c})',
-      },
-      // Die series-eigene Farbe wird hier nicht mehr gesetzt, da die einzelnen Datenpunkte ihr eigenes itemStyle besitzen
-      emphasis: { focus: 'series' },
-      z: 10,
-    })
-  }
-  let allCoordinates = Object.values(points)
-  series.forEach((serie) => {
-    if (serie.type === 'line' && Array.isArray(serie.data)) {
-      serie.data.forEach((coord) => {
-        if (Array.isArray(coord) && coord.length === 2) {
-          allCoordinates.push(coord)
-        }
+        tooltip: {
+          formatter: `<strong>${key}</strong><br>(${obj.coord[0]}, ${obj.coord[1]})`,
+        },
+        z: 10,
       })
+      allCoords.push(obj.coord)
+    } else if (obj.type === 'line') {
+      series.push({
+        name: key,
+        type: 'line',
+        coordinateSystem: 'cartesian2d',
+        data: obj.data,
+        symbol: 'none',
+        lineStyle: {
+          color:
+            obj.style && obj.style.lineColor ? obj.style.lineColor : '#000',
+          width: obj.style && obj.style.lineWidth ? obj.style.lineWidth : 2,
+          type: obj.style && obj.style.lineType ? obj.style.lineType : 'solid',
+        },
+        tooltip: { formatter: obj.tooltip || key },
+      })
+      if (obj.data && Array.isArray(obj.data)) {
+        obj.data.forEach((coord) => {
+          allCoords.push(coord)
+        })
+      }
+    } else if (obj.type === 'polygon') {
+      series.push({
+        name: key,
+        type: 'line',
+        coordinateSystem: 'cartesian2d',
+        data: obj.data,
+        symbol: 'none',
+        lineStyle: {
+          color:
+            obj.style && obj.style.lineColor ? obj.style.lineColor : '#0A0',
+          width: obj.style && obj.style.lineWidth ? obj.style.lineWidth : 2,
+          type: obj.style && obj.style.lineType ? obj.style.lineType : 'solid',
+        },
+        areaStyle: {
+          color:
+            obj.style && obj.style.fillColor
+              ? obj.style.fillColor
+              : 'rgba(0,170,0,0.3)',
+        },
+        tooltip: { formatter: obj.tooltip || key },
+      })
+      if (obj.data && Array.isArray(obj.data)) {
+        obj.data.forEach((coord) => {
+          allCoords.push(coord)
+        })
+      }
+    } else if (obj.type === 'text') {
+      series.push({
+        name: key,
+        type: 'scatter',
+        coordinateSystem: 'cartesian2d',
+        data: [obj.coord],
+        symbolSize: 0,
+        label: {
+          show: true,
+          formatter: obj.text,
+          position: 'top',
+          fontSize: obj.style && obj.style.fontSize ? obj.style.fontSize : 14,
+          color: obj.style && obj.style.color ? obj.style.color : '#000',
+        },
+        tooltip: { show: false },
+      })
+      allCoords.push(obj.coord)
     }
-  })
+  }
+  // Bestimme Achsenlimits anhand aller Koordinaten
   let minX = -10,
     maxX = 10,
     minY = -10,
     maxY = 10
-  if (allCoordinates.length > 0) {
-    let allXs = allCoordinates.map((p) => p[0])
-    let allYs = allCoordinates.map((p) => p[1])
-    minX = Math.min(...allXs) - 1
-    maxX = Math.max(...allXs) + 1
-    minY = Math.min(...allYs) - 1
-    maxY = Math.max(...allYs) + 1
+  if (allCoords.length > 0) {
+    let xs = allCoords.map((c) => c[0])
+    let ys = allCoords.map((c) => c[1])
+    minX = Math.min(...xs) - 1
+    maxX = Math.max(...xs) + 1
+    minY = Math.min(...ys) - 1
+    maxY = Math.max(...ys) + 1
   }
-
-  // Berechnung der Achsenbereiche
-  let xRange = maxX - minX
-  let yRange = maxY - minY
-
-  // Gleichmäßige Skalierung
+  let xRange = maxX - minX,
+    yRange = maxY - minY
   if (xRange > yRange) {
     let centerY = (minY + maxY) / 2
     let halfHeight = xRange / 2
@@ -1278,8 +1185,6 @@ function GBScript_render(userAxisLimits = {}) {
     minX = centerX - halfWidth
     maxX = centerX + halfWidth
   }
-
-  // Überschreiben mit benutzerdefinierten Grenzen, falls angegeben
   if (typeof userAxisLimits.minX === 'number') minX = userAxisLimits.minX
   if (typeof userAxisLimits.maxX === 'number') maxX = userAxisLimits.maxX
   if (typeof userAxisLimits.minY === 'number') minY = userAxisLimits.minY
@@ -1288,21 +1193,25 @@ function GBScript_render(userAxisLimits = {}) {
   if (typeof globalAxisLimits.maxX === 'number') maxX = globalAxisLimits.maxX
   if (typeof globalAxisLimits.minY === 'number') minY = globalAxisLimits.minY
   if (typeof globalAxisLimits.maxY === 'number') maxY = globalAxisLimits.maxY
-  const resultObj = {
+  let titleObj = TITLE ? { text: TITLE, left: 'center' } : undefined
+  const option = {
     title: titleObj,
     tooltip: { trigger: 'item' },
     xAxis: { type: 'value', min: minX, max: maxX, splitLine: { show: false } },
     yAxis: { type: 'value', min: minY, max: maxY, splitLine: { show: false } },
     series: series,
   }
-  return toSource(resultObj)
+  return toSource(option)
 }
 
-// ------------------------------------------------------------
-// Funktion: GBScriptEval
-// Führt einen Code-String aus (nachdem die globalen Variablen initialisiert wurden)
-// und gibt das von GBScript_render erzeugte Objekt zurück.
-// ------------------------------------------------------------
+/* ============================================================
+   Ausführungsfunktion
+   ============================================================
+   GBScriptEval initialisiert zuerst die globalen Variablen,
+   führt dann den übergebenen Code (z. B. Konstruktionsbefehle)
+   aus und gibt schließlich die anhand des Dictionaries erzeugte
+   ECharts-Konfiguration zurück.
+   ============================================================ */
 function GBScriptEval(code) {
   GBScript_init()
   try {
@@ -1314,16 +1223,20 @@ function GBScriptEval(code) {
   }
 }
 
-// ------------------------------------------------------------
 // Exponiere die Funktionen als Teil des globalen Objekts
-// ------------------------------------------------------------
 window.GGBScript = GBScriptEval
 
 /* 
 Beispielhafte Nutzung:
 
-const P = Polygon("P1", "P2", "P3", "P4", A, B, C); 
-Farbe(P, "lightblue");
-Name(P, "Polygon ABC");
-
+// Beispielskript: Zwei Punkte, eine Linie und anschließende Rotation
+Punkt(1, 2, "A")
+Punkt(4, 5, "B")
+Linie("A", "B", "L1")
+Rotation("L1", "A", 45)  // Rotiert die Linie um Punkt A (in-place, da kein neuer Name)
+Titel("Beispiel-Diagramm")
+const optionString = GGBScript(`
+// Hier können weitere Befehle stehen
+`)
+console.log(optionString)
 */
