@@ -1,4 +1,8 @@
 <!--
+author:  André Dietrich; ChatGPT
+
+comment: Dieses Dokument wurde mithilfe von ChatGPT erstellt und enthält eine experimentelle Version eines GGBScript JavaScript-Interpreters für LiaScript.
+
 script:   src/index.js
 
 @GGBScript
@@ -29,6 +33,22 @@ setTimeout(render, window.GGBScript ? 10 : 200)
 
 # GGBScript
 
+Dies ist ein GGBScript JavaScript interpreter für LiaScript.
+Es handelt sich um eine experimentelle Version, die noch nicht vollständig ist und mithilfe von ChatGPT entwickelt wurde.
+
+Um die Funktionalität in ein LiaScript-Dokument einzubinden, fügen Sie den folgenden Code ein:
+
+`import: https://raw.githubusercontent.com/LiaTemplates/GGBScript/refs/heads/main/README.md`
+
+Das folgende Beispiel zeigt wie dies funktioniert:
+
+[LiveEditor](https://liascript.github.io/LiveEditor/?/show/code/H4sIAAAAAAAAA62T0W6bMBSG7/0UnndDJIiBqamahajAul60SKjt7nETN/EGBtmHrXurPUOfbMYsCVVpJ0W9wueH//98DjqLD56HRNXUCuZ4C9DoOaWK/ZpuBGzb+1ZztaolcAnTVV3Ra8HueNWUDLiml5fJ7UqJBqjiD5puOVtrWjEh6c1F/CW7mFZr5HlLhD7ijMEWoRhH2Flo68FCNi1ERDG54QRXQkbEN0/2GJHAN6efrGx5RE7MUQNvjErwmj+wtoRerVuwCbFPlujcxqEF7dOXLnqD41nAMahgBIUmCCVHdHY2G8N16g6XvFdn4ekYqlP3qNc6Q+kRrYWjkwwHk0zfrbX/o15r7aYGBqKWc/wWdwf9NDtAR5kDpPqXPAJ++mNmWhQF/q7x+X6D0DezaPGj0NeiEqAd3w1OfNd3Z/7kM0JmAzXgbnvyVv4Ap890itgvJi7eV0FXkZgYS+9IXjiSZ46kdyQHR/rCkT5zpL0jJYdr5Z2lLn9vaukYuM3bf/KVqXvu5KZWfD0wZcaUCQBeNpaWD/JC8273azprdsDv5movkYcDRFcZbaM4l1a+Ulxox3iDmdFt1elm8n8B100U+PMEAAA=)
+
+Schauen Sie sich das Dokument im LiaScript modus an:
+
+[LiaScript](https://liascript.github.io/course/?https://raw.githubusercontent.com/LiaTemplates/GGBScript/refs/heads/main/README.md)
+
+Durch Doppelklick auf die Grafik können Sie den Code bearbeiten und die Änderungen werden sofort angezeigt.
 
 ## Punkt
 
