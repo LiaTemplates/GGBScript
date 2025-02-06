@@ -58,19 +58,37 @@ const g2 = Gerade(C, D, "g2");
 
 ## Strecke
 
-``` js @GGBScript
-Titel("Strecke s1 & s2");
+1. `Strecke( Punkt, Punkt )`
 
-// Definiere Punkte
-const A = Punkt(1, 2, "A");
-const B = Punkt(4, 6, "B");
-const C = Punkt(2, 5, "C");
-const D = Punkt(6, 3, "D");
+   Erzeugt eine Strecke zwischen zwei Punkten.
 
-// Erzeuge zwei Strecken
-const s1 = Strecke(A, B, "s1");
-const s2 = Strecke(C, D, "s2");
-```
+   ``` js @GGBScript
+   Titel("Strecke S");
+
+   // Definiere Punkte
+   const A = Punkt(1, 2, "A");
+   const B = Punkt(4, 6, "B");
+
+   // Erzeuge eine Strecke
+   const S = Strecke(A, B, "S");
+   ```
+
+2. `Strecke( Punkt, Länge )`
+
+   ``` js @GGBScript
+   Titel("Strecke s1 & s2 & s3");
+
+   // Definiere Punkte
+   const A = Punkt(1, 2, "A");
+   const B = Punkt(4, 6, "B");
+
+   // Erzeuge zwei Strecken
+   const s1 = Strecke(A, 2, "s1");
+   const s2 = Strecke(B, 3, "s2");
+   const s3 = Strecke([1,1], 3, "s3");
+   ```
+
+
 
 ## Polygon
 
@@ -206,7 +224,7 @@ Titel("Verschiebung");
 const A = Punkt(1, 2, "A");
 
 // Verschiebe den Punkt
-Verschiebung(A, 2, 3);
+const B = Verschiebung(A, 2, 3, "B");
 ```
 
 ---

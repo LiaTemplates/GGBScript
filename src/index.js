@@ -144,12 +144,58 @@ function Line(arg1, arg2, name = null) {
 // Zeichnet einen Streckenabschnitt zwischen zwei Punkten.
 // ------------------------------------------------------------
 function Strecke(arg1, arg2, name = null) {
-  const coord1 = getCoord(arg1),
-    coord2 = getCoord(arg2)
-  if (!coord1 || !coord2) {
-    console.error('Strecke: Mindestens einer der beiden Punkte ist ungültig.')
+  // Bestimme den Startpunkt
+  const startCoord = getCoord(arg1)
+  if (!startCoord) {
+    console.error('Strecke: Startpunkt ist ungültig.')
     return null
   }
+
+  // Falls der Startpunkt als Koordinate (Array) übergeben wurde, wird zusätzlich ein Anfangspunkt angelegt.
+  if (typeof arg1 !== 'string') {
+    // Generiere einen Namen für den Anfangspunkt: "P_start_" + <Streckenname> (falls vorhanden) oder mit Index.
+    let startPointName = name ? 'P_start_' + name : null
+    if (!startPointName) {
+      let index = 1
+      while (objects['P_start' + index]) index++
+      startPointName = 'P_start' + index
+    }
+    objects[startPointName] = {
+      type: 'point',
+      coord: startCoord,
+      style: { color: 'red' },
+    }
+  }
+
+  let endCoord
+  // Flag, ob ein zusätzlicher Endpunkt als Punkt gezeichnet werden soll (falls Länge angegeben wird)
+  let appendEndPoint = false
+
+  // Fall 1: arg2 ist ein bekannter Punkt (String oder Array)
+  if (
+    (typeof arg2 === 'string' &&
+      objects[arg2] &&
+      objects[arg2].type === 'point') ||
+    (Array.isArray(arg2) && arg2.length === 2)
+  ) {
+    endCoord = getCoord(arg2)
+    if (!endCoord) {
+      console.error('Strecke: Endpunkt ist ungültig.')
+      return null
+    }
+  }
+  // Fall 2: arg2 ist eine Zahl (Länge) → Strecke wird horizontal (nach rechts) konstruiert
+  else if (typeof arg2 === 'number') {
+    endCoord = [startCoord[0] + arg2, startCoord[1]]
+    appendEndPoint = true
+  } else {
+    console.error(
+      'Strecke: Zweiter Parameter muss entweder ein bekannter Punkt oder eine Länge (Zahl) sein.'
+    )
+    return null
+  }
+
+  // Generiere einen Namen für die Strecke, falls keiner angegeben ist
   let index = 1
   if (!name) {
     while (objects['Strecke' + index]) index++
@@ -158,12 +204,25 @@ function Strecke(arg1, arg2, name = null) {
     console.error(`Strecke: Element "${name}" existiert bereits.`)
     return name
   }
+
+  // Erzeuge die Strecke als "line" im gemeinsamen Dictionary
   objects[name] = {
     type: 'line',
-    data: [coord1, coord2],
+    data: [startCoord, endCoord],
     style: { lineColor: '#F00', lineWidth: 2, lineType: 'solid' },
-    tooltip: `<strong>${name}</strong><br>Start: (${coord1[0]}, ${coord1[1]})<br>Ende: (${coord2[0]}, ${coord2[1]})`,
+    tooltip: `<strong>${name}</strong><br>Start: (${startCoord[0]}, ${startCoord[1]})<br>Ende: (${endCoord[0]}, ${endCoord[1]})`,
   }
+
+  // Falls der Endpunkt aus einer Längenangabe berechnet wurde, zeichne zusätzlich einen Endpunkt.
+  if (appendEndPoint) {
+    let endPointName = 'P_end_' + name
+    objects[endPointName] = {
+      type: 'point',
+      coord: endCoord,
+      style: { color: 'blue' }, // Beispiel: blaue Farbe für den Endpunkt
+    }
+  }
+
   return name
 }
 
