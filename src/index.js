@@ -435,7 +435,7 @@ function Vieleck(...args) {
 
   // Hilfsfunktion zur Berechnung des Abstands zwischen zwei Punkten
   function dist(p1, p2) {
-    return Math.sqrt((p1[0] - p2[0]) ** 2 + (p1[1] - p2[1]) ** 2)
+    return Math.sqrt(Math.pow(p1[0] - p2[0], 2) + Math.pow(p1[1] - p2[1], 2))
   }
 
   // Variante 1: Vieleck( <Liste von Punkten> )
@@ -1191,8 +1191,8 @@ function Winkel(A, B, C, name = null) {
   const AB = [a[0] - b[0], a[1] - b[1]]
   const BC = [c[0] - b[0], c[1] - b[1]]
   const dotProduct = AB[0] * BC[0] + AB[1] * BC[1]
-  const normAB = Math.sqrt(AB[0] ** 2 + AB[1] ** 2)
-  const normBC = Math.sqrt(BC[0] ** 2 + BC[1] ** 2)
+  const normAB = Math.sqrt(Math.pow(AB[0], 2) + Math.pow(AB[1], 2))
+  const normBC = Math.sqrt(Math.pow(BC[0], 2) + Math.pow(BC[1], 2))
   if (normAB === 0 || normBC === 0) {
     console.error('Winkel: Nullvektor erkannt.')
     return null
