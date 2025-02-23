@@ -898,7 +898,7 @@ function Verschiebung(element, verschiebungX, verschiebungY, name = null) {
         console.error('Verschiebung: Name existiert bereits.')
         return null
       }
-      objects[name] = { ...obj, coord: newCoord }
+      objects[name] = Object.assign({}, obj, { coord: newCoord })
       return name
     } else {
       obj.coord = newCoord
@@ -911,7 +911,7 @@ function Verschiebung(element, verschiebungX, verschiebungY, name = null) {
         console.error('Verschiebung: Name existiert bereits.')
         return null
       }
-      objects[name] = { ...obj, data: newData }
+      objects[name] = Object.assign({}, obj, { coord: newCoord })
       return name
     } else {
       obj.data = newData
@@ -952,7 +952,8 @@ function Rotation(element, drehpunkt, winkelGrad, name = null) {
         console.error('Rotation: Name existiert bereits.')
         return null
       }
-      objects[name] = { ...obj, coord: newCoord }
+      //objects[name] = { ...obj, coord: newCoord }
+      objects[name] = Object.assign({}, obj, { coord: newCoord })
       return name
     } else {
       obj.coord = newCoord
@@ -965,7 +966,8 @@ function Rotation(element, drehpunkt, winkelGrad, name = null) {
         console.error('Rotation: Name existiert bereits.')
         return null
       }
-      objects[name] = { ...obj, data: newData }
+      // objects[name] = { ...obj, data: newData }
+      objects[name] = Object.assign({}, obj, { coord: newCoord })
       return name
     } else {
       obj.data = newData
@@ -1002,7 +1004,8 @@ function Spiegelung(element, spiegelungsPunkt, name = null) {
         console.error('Spiegelung: Name existiert bereits.')
         return null
       }
-      objects[name] = { ...obj, coord: newCoord }
+      // objects[name] = { ...obj, coord: newCoord }
+      objects[name] = Object.assign({}, obj, { coord: newCoord })
       return name
     } else {
       obj.coord = newCoord
@@ -1015,7 +1018,8 @@ function Spiegelung(element, spiegelungsPunkt, name = null) {
         console.error('Spiegelung: Name existiert bereits.')
         return null
       }
-      objects[name] = { ...obj, data: newData }
+      // objects[name] = { ...obj, data: newData }
+      objects[name] = Object.assign({}, obj, { coord: newCoord })
       return name
     } else {
       obj.data = newData
